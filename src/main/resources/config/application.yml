@@ -92,7 +92,7 @@ management:
 
 spring:
   application:
-    name: MailMerge
+    name: mailmerge
   docker:
     compose:
       enabled: true
@@ -157,13 +157,13 @@ spring:
             scope: openid, profile, email, offline_access # last one for refresh tokens
   task:
     execution:
-      thread-name-prefix: mail-merge-task-
+      thread-name-prefix: mailmerge-task-
       pool:
         core-size: 2
         max-size: 50
         queue-capacity: 10000
     scheduling:
-      thread-name-prefix: mail-merge-scheduling-
+      thread-name-prefix: mailmerge-scheduling-
       pool:
         size: 2
   thymeleaf:
@@ -194,7 +194,7 @@ info:
 
 jhipster:
   clientApp:
-    name: 'mailMergeApp'
+    name: 'mailmergeApp'
   # By default CORS is disabled. Uncomment to enable.
   # cors:
   #   allowed-origins: "http://localhost:8100,http://localhost:9000"
@@ -204,12 +204,12 @@ jhipster:
   #   allow-credentials: true
   #   max-age: 1800
   mail:
-    from: MailMerge@localhost
+    from: mailmerge@localhost
   api-docs:
     default-include-pattern: /api/**
     management-include-pattern: /management/**
-    title: Mail Merge API
-    description: Mail Merge API documentation
+    title: Mailmerge API
+    description: Mailmerge API documentation
     version: 0.0.1
     terms-of-service-url:
     contact-name:
@@ -218,7 +218,7 @@ jhipster:
     license: unlicensed
     license-url:
   security:
-    content-security-policy: "default-src 'self'; frame-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://storage.googleapis.com; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; img-src 'self' data:; font-src 'self' https://fonts.gstatic.com data:"
+    content-security-policy: "default-src 'self'; frame-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://storage.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
     oauth2:
       audience:
         - account

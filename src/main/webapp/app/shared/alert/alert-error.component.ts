@@ -23,12 +23,12 @@ export class AlertErrorComponent implements OnDestroy {
   private readonly eventManager = inject(EventManager);
 
   constructor() {
-    this.errorListener = this.eventManager.subscribe('mailMergeApp.error', (response: EventWithContent<unknown> | string) => {
+    this.errorListener = this.eventManager.subscribe('mailmergeApp.error', (response: EventWithContent<unknown> | string) => {
       const errorResponse = (response as EventWithContent<AlertError>).content;
       this.addErrorAlert(errorResponse.message);
     });
 
-    this.httpErrorListener = this.eventManager.subscribe('mailMergeApp.httpError', (response: EventWithContent<unknown> | string) => {
+    this.httpErrorListener = this.eventManager.subscribe('mailmergeApp.httpError', (response: EventWithContent<unknown> | string) => {
       this.handleHttpError(response);
     });
   }

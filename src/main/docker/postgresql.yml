@@ -4,9 +4,9 @@ services:
   postgresql:
     image: postgres:17.0
     # volumes:
-    #   - ~/volumes/jhipster/MailMerge/postgresql/:/var/lib/postgresql/data/
+    #   - ~/volumes/jhipster/mailmerge/postgresql/:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=MailMerge
+      - POSTGRES_USER=mailmerge
       - POSTGRES_PASSWORD=password
       - POSTGRES_HOST_AUTH_METHOD=trust
     healthcheck:

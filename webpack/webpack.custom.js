@@ -19,7 +19,7 @@ module.exports = async (config, options, targetOptions) => {
         extensions: ['ts', 'js', 'html'],
       }),
       new WebpackNotifierPlugin({
-        title: 'Mail Merge',
+        title: 'Mailmerge',
         contentImage: path.join(__dirname, 'logo-jhipster.png'),
       }),
     );
