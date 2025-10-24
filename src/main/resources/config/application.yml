@@ -147,14 +147,47 @@ spring:
   security:
     oauth2:
       client:
-        provider:
-          oidc:
-            issuer-uri: http://localhost:9080/realms/jhipster
         registration:
+          azure:
+            provider: azure
+            client-id: ${AZURE_CLIENT_ID}
+            client-secret: ${AZURE_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/azure"
+            scope:
+              - openid
+              - profile
+              - email
+              - offline_access
+              - Mail.Send
+
+            # ALIAS so the default JHipster link /oauth2/authorization/oidc still works
           oidc:
-            client-id: web_app
-            client-secret: web_app
-            scope: openid, profile, email, offline_access # last one for refresh tokens
+            provider: azure    # <-- IMPORTANT: reuse the 'azure' provider, NOT 'oidc'
+            client-id: ${AZURE_CLIENT_ID}
+            client-secret: ${AZURE_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/oidc"
+            scope:
+              - openid
+              - profile
+              - email
+              - offline_access
+              - Mail.Send
+
+        provider:
+          # Provider actually used by both registrations (explicit endpoints, no issuer-uri)
+          azure:
+            authorization-uri: https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/organizations/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/organizations/discovery/v2.0/keys
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            user-name-attribute: preferred_username
+
+          # Placeholder ONLY so JHipster's SecurityConfiguration can read this property.
+          # No registration points to provider 'oidc', so Spring won't try to parse it.
+          oidc:
+            issuer-uri: https://login.microsoftonline.com/organizations/v2.0
   task:
     execution:
       thread-name-prefix: mailmerge-task-
