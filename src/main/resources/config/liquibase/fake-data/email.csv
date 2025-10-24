@@ -1,0 +1,11 @@
+id;email_address;content;variables_json;status;sent_at
+1;expansion bestride;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T08:11:34
+2;label;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T18:06:45
+3;fooey mmm lightly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T09:47:39
+4;whoever;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-24T02:46:28
+5;substantiate amidst sparkling;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T06:51:41
+6;gosh yuck rightfully;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T22:51:28
+7;why hmph buck;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T22:06:04
+8;brr underneath enfold;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T23:55:27
+9;young pantyhose safely;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T17:07:51
+10;whirlwind sardonic;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;FAILED;2025-10-23T15:48:51
