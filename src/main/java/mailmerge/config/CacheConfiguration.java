@@ -50,6 +50,13 @@ public class CacheConfiguration {
             createCache(cm, mailmerge.domain.User.class.getName());
             createCache(cm, mailmerge.domain.Authority.class.getName());
             createCache(cm, mailmerge.domain.User.class.getName() + ".authorities");
+            createCache(cm, mailmerge.domain.Project.class.getName());
+            createCache(cm, mailmerge.domain.Project.class.getName() + ".emails");
+            createCache(cm, mailmerge.domain.Project.class.getName() + ".headings");
+            createCache(cm, mailmerge.domain.Email.class.getName());
+            createCache(cm, mailmerge.domain.Email.class.getName() + ".attachments");
+            createCache(cm, mailmerge.domain.Attachment.class.getName());
+            createCache(cm, mailmerge.domain.Heading.class.getName());
             // jhipster-needle-ehcache-add-entry
         };
     }

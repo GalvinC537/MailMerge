@@ -1,0 +1,26 @@
+{
+  "annotations": {
+    "changelogDate": "20251024104753"
+  },
+  "applications": "*",
+  "dto": "mapstruct",
+  "fields": [
+    {
+      "fieldName": "content",
+      "fieldType": "String"
+    }
+  ],
+  "jpaMetamodelFiltering": true,
+  "name": "Attachment",
+  "relationships": [
+    {
+      "otherEntityName": "email",
+      "otherEntityRelationshipName": "attachments",
+      "relationshipName": "email",
+      "relationshipSide": "right",
+      "relationshipType": "many-to-one"
+    }
+  ],
+  "searchEngine": "no",
+  "service": "serviceClass"
+}

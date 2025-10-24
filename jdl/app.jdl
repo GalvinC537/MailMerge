@@ -1,0 +1,51 @@
+// Global options
+service * with serviceClass // For every entity create a service.java folder
+dto * with mapstruct // generate DTOs for every entity, using MapStruct to convert between them and the entities
+paginate Email, Project with pagination // Helps prevent performance issues when we have high amount of emails
+filter * // Adds a filtering layer
+
+enum EmailStatus {
+  PENDING,
+  SENT,
+  FAILED
+}
+
+// This entity is for the Users Project
+entity Project {
+  name String required minlength(1)
+  spreadsheetLink String required  // Blob/URL or object key
+}
+
+// This entity is used to store all the emails which have been created
+// Remember going to have to return error if no field "email" in spreadsheet
+entity Email {
+  emailAddress String required // receiver email address
+  content TextBlob required // This is the actual email
+  variablesJson TextBlob // store row data: {"firstName":"Conor", ...}
+  status EmailStatus required // PENDING/ SENT/FAILED
+  sentAt Instant // When the email was sent
+}
+
+entity Attachment {
+  content String
+}
+
+entity Heading {
+  name String required // example: firstname
+}
+
+// Relationships
+
+// User is the built-in JHipster entity
+relationship ManyToOne {
+  Project{user(login)} to User with builtInEntity // One User can have many projects
+}
+
+relationship OneToMany {
+  Project{emails} to Email{project} // One project can have many emails
+  Project{headings} to Heading{project} // One project can have many headings
+  Email{attachments} to Attachment{email} // One email can have many attachments
+}
+
+
+
