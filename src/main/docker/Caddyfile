@@ -1,0 +1,54 @@
+{
+	#email address for letsencrypt
+	email EMAIL
+	# to retrieve real certificates use https://acme-v02.api.letsencrypt.org/directory or https://acme.zerossl.com/v2/DV90 instead of ACME in the git repo file src/main/docker/Caddyfile
+	# requires the VM to be accessible directly from the public internet via port 80 and 443
+	acme_ca ACME
+}
+DOMAIN {
+	handle_errors {
+		respond "This production version of the app will only become available after a tagged commit has been made to the main branch.
+
+A development version of the app should be accessible here: http://DEVDOMAIN/
+
+Error connecting to production app backend on docker host http://teamproject-prd:8080.
+
+After a tagged commit has deployed, wait 30 seconds and refresh this page.
+
+If still not live, login to the VM via SSH and try to debug using 'docker compose -f ~/team-project/prd.yml up'"
+	}
+	reverse_proxy http://teamproject-prd:8080
+}
+DEVDOMAIN {
+	handle_errors {
+  respond "Error connecting to DEVDOMAIN development app backend on docker host http://teamproject-dev:8080.
+
+After a commit to the main branch has deployed, wait 30 seconds and refresh this page.
+
+If still not live, login to the VM via SSH and try to debug using 'docker compose -f ~/team-project/dev.yml up'"
+	}
+	reverse_proxy http://teamproject-dev:8080
+}
+
+#the following three lines can be removed once the server is confirmed working
+DEPLOY_IP:80 {
+	header Content-Type text/html
+  respond <<HTML
+          <html>
+           <h1>Caddy web server is running on DEPLOY_IP </h1> <br/>
+           <p>After getting DNS entries from <a href=https://forms.office.com/e/C0kaiRMuDD>https://forms.office.com/e/C0kaiRMuDD</a> <br/> try:
+           <a href=http://DEVDOMAIN>http://DEVDOMAIN</a> or<br> <a href=http://DOMAIN>http://DOMAIN</a> </p>
+          <html>
+          HTML 200
+}
+
+#to serve on a CUSTOMURL e.g. sceletons.bham.team
+# 1) request a DNS entry for sceletons.bham.team pointing at the Virtual Machine IP address (DEPLOY_IP) https://forms.office.com/e/C0kaiRMuDD
+# 2) replace '#CUSTOMURL' with 'sceletons.bham.team', uncomment the last lines of the file (lines 49-54) in the git repo file src/main/docker/Caddyfile
+# 3) make a tagged commit
+#CUSTOMURL {
+#  handle_errors {
+#    respond "CUSTOMURL not working check DOMAIN is up"
+#  }
+#  reverse_proxy http://teamproject-prd:8080
+#}
