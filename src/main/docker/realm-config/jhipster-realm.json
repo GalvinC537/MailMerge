@@ -614,7 +614,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "0108208b-aded-497d-9926-cb46106b024a",
+      "secret": "REDACTED",
       "redirectUris": [],
       "webOrigins": [],
       "notBefore": 0,
