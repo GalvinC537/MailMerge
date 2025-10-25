@@ -1,36 +1,40 @@
-# This configuration is intended for development purpose, it's **your** responsibility to harden it for production
+# prd.yml
 services:
-  teamproject-prd:
-    image: teamproject:latest
+  mailmerge-prd:
+    image: "${CI_REGISTRY_IMAGE}:${CI_COMMIT_TAG}"   # from .env written by workflow
     restart: always
     environment:
       - _JAVA_OPTIONS=-Xmx512m -Xms256m
       - SPRING_PROFILES_ACTIVE=prod,api-docs
       - MANAGEMENT_METRICS_EXPORT_PROMETHEUS_ENABLED=true
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://teamproject-postgresql-prd:5433/teamproject24
-      - SPRING_LIQUIBASE_URL=jdbc:postgresql://teamproject-postgresql-prd:5433/teamproject24
-      - JHIPSTER_SLEEP=15 # gives time for other services to boot before the application
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://mailmerge-postgresql-prd:5432/mailmerge
+      - SPRING_LIQUIBASE_URL=jdbc:postgresql://mailmerge-postgresql-prd:5432/mailmerge
+      - SPRING_DATASOURCE_USERNAME=mailmerge
+      - SPRING_DATASOURCE_PASSWORD=
+      - JHIPSTER_SLEEP=15
     ports:
-      - 9090:8080
+      - "9090:8080"   # external:internal
+    depends_on:
+      - mailmerge-postgresql-prd
     networks:
       - app-network
-  teamproject-postgresql-prd:
+
+  mailmerge-postgresql-prd:
     image: postgres:14.5
     restart: always
-    # to delete the database content between deployments, comment the following two lines
-    volumes:
-      - ~/prd/volumes/jhipster/teamproject/postgresql/:/var/lib/postgresql/data/
+    # uncomment + set an absolute host path if you want data to persist across deploys
+    # volumes:
+    #   - /home/ubuntu/prd/volumes/jhipster/mailmerge/postgresql/:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=teamproject24
+      - POSTGRES_USER=mailmerge
       - POSTGRES_PASSWORD=
+      - POSTGRES_DB=mailmerge
       - POSTGRES_HOST_AUTH_METHOD=trust
-      - PGPORT= 5433
-    # If you want to expose these ports outside your dev machine,
-    # uncomment the following two lines and remove the "127.0.0.1:" prefix
-    #ports:
-    #  - 127.0.0.1:5433:5433
+    # DB is only used internally; no need to expose it publicly
     networks:
       - app-network
+
 networks:
   app-network:
     driver: bridge
+
