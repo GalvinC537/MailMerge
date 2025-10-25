@@ -14,7 +14,7 @@ jobs:
 
     # 👇 NEW: define a lowercased GHCR image reference once, reuse everywhere
     env:
-      IMAGE: ${{ toLower(format('ghcr.io/{0}/{1}', github.repository_owner, github.event.repository.name)) }}
+      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
       DOCKER_HOST: 'tcp://127.0.0.1:2375'
       DOCKER_DRIVER: overlay2
 
