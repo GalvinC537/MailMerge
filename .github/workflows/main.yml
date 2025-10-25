@@ -12,9 +12,7 @@ jobs:
       contents: read
       packages: write
 
-    # 👇 NEW: define a lowercased GHCR image reference once, reuse everywhere
     env:
-      IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.event.repository.name }}
       DOCKER_HOST: 'tcp://127.0.0.1:2375'
       DOCKER_DRIVER: overlay2
 
@@ -40,6 +38,11 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
+
+      # Compute a strictly-lowercase image ref once and export to $IMAGE
+      - name: Compute IMAGE (lowercase)
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -70,11 +73,11 @@ jobs:
 
       - name: Build and push Docker image to ghcr
         run: |
-          echo "pushing $IMAGE:${{ github.sha }} (and :latest)"
+          echo "pushing $IMAGE:${GITHUB_SHA} (and :latest)"
           ./mvnw -ntp clean compile jib:build -DskipTests -Pprod \
-            -Djib.to.auth.username=${{ github.actor }} \
+            -Djib.to.auth.username=${GITHUB_ACTOR} \
             -Djib.to.auth.password=${{ secrets.GITHUB_TOKEN }} \
-            -Djib.to.image=${IMAGE}:${{ github.sha }} \
+            -Djib.to.image=$IMAGE:${GITHUB_SHA} \
             -Djib.to.tags=latest \
             -Dmaven.repo.local=$MAVEN_USER_HOME
         env:
@@ -88,20 +91,22 @@ jobs:
     concurrency:
       group: deployment
     env:
-      IMAGE: ${{ toLower(format('ghcr.io/{0}/{1}', github.repository_owner, github.event.repository.name)) }}
-      RSA_PRIVATE_KEY: ${{secrets.RSA_PRIVATE_KEY}}
+      RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
       URL: '${{ github.event.repository.name }}.bham.team'
       DEVURL: '${{ github.event.repository.name }}.dev.bham.team'
       ACME: 'https://acme-v02.api.letsencrypt.org/directory'
       ACME_STAGING: 'https://acme-staging-v02.api.letsencrypt.org/directory'
       CI_REGISTRY_USER: ${{ github.actor }}
       CI_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
-      CI_REGISTRY_IMAGE: ${{ env.IMAGE }}          # 👈 CHANGED: use lowercased image
       CI_REGISTRY: ghcr.io
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Compute IMAGE (lowercase)
+        run: |
+          echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Set up SSH key
         run: |
@@ -118,8 +123,8 @@ jobs:
         run: |
           echo CI_REGISTRY_USER=${{ env.CI_REGISTRY_USER }} \
                CI_REGISTRY_PASSWORD=${{ env.CI_REGISTRY_PASSWORD }} \
-               CI_REGISTRY_IMAGE=${{ env.CI_REGISTRY_IMAGE }} \
-               CI_COMMIT_TAG=${{ github.sha }} \
+               CI_REGISTRY_IMAGE=$IMAGE \
+               CI_COMMIT_TAG=${GITHUB_SHA} \
                CI_REGISTRY=${{ env.CI_REGISTRY }} \
                ACME=${{ env.ACME_STAGING }} \
                DEVURL=${{ env.DEVURL }} \
@@ -156,7 +161,7 @@ jobs:
     concurrency:
       group: deployment
     env:
-      RSA_PRIVATE_KEY: ${{secrets.RSA_PRIVATE_KEY}}
+      RSA_PRIVATE_KEY: ${{ secrets.RSA_PRIVATE_KEY }}
 
     steps:
       - name: Checkout repository
@@ -179,4 +184,3 @@ jobs:
             docker compose -f ~/team-project/prd.yml up -d
             docker system prune --force --filter 'until=24h'
           "
-
