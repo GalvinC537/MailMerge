@@ -39,7 +39,6 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
 
-      # Compute a strictly-lowercase image ref once and export to $IMAGE
       - name: Compute IMAGE (lowercase)
         run: |
           echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
@@ -119,32 +118,45 @@ jobs:
       - name: Add SSH known hosts
         run: ssh-keyscan -H ${{ secrets.DEPLOY_IP }} >> ~/.ssh/known_hosts
 
+      # ✅ Fixed block: proper multiline .env with Azure secrets
       - name: Save CI variables for transfer
         run: |
-          echo CI_REGISTRY_USER=${{ env.CI_REGISTRY_USER }} \
-               CI_REGISTRY_PASSWORD=${{ env.CI_REGISTRY_PASSWORD }} \
-               CI_REGISTRY_IMAGE=$IMAGE \
-               CI_COMMIT_TAG=${GITHUB_SHA} \
-               CI_REGISTRY=${{ env.CI_REGISTRY }} \
-               ACME=${{ env.ACME }} \
-               DEVURL=${{ env.DEVURL }} \
-               URL=${{ env.URL }} \
-               DEPLOY_IP=${{ secrets.DEPLOY_IP }} \
-               EMAIL=${{ github.event.head_commit.author.email || 'noreply@github.com' }} \
-               > src/main/docker/.env
+          cat > src/main/docker/.env <<EOF
+          CI_REGISTRY_USER=${{ env.CI_REGISTRY_USER }}
+          CI_REGISTRY_PASSWORD=${{ env.CI_REGISTRY_PASSWORD }}
+          CI_REGISTRY_IMAGE=$IMAGE
+          CI_COMMIT_TAG=${GITHUB_SHA}
+          CI_REGISTRY=${{ env.CI_REGISTRY }}
+          ACME=${{ env.ACME }}
+          DEVURL=mailmerge.dev.bham.team
+          URL=mailmerge.bham.team
+          DEPLOY_IP=${{ secrets.DEPLOY_IP }}
+          EMAIL=${{ github.event.head_commit.author.email || 'noreply@github.com' }}
+          AZURE_CLIENT_ID=${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET=${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_TENANT_ID=${{ secrets.AZURE_TENANT_ID }}
+          EOF
 
       - name: Install Docker and prepare the server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
-            rm -rf ~/team-project || true
+            mkdir -p ~/team-project
             which docker || sh team-project/install-docker.sh
           "
 
       - name: Transfer files to the server
         run: scp -o StrictHostKeyChecking=no -r src/main/docker/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}:~/team-project
 
-      - name: Install app on the server
-        run: ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "sh team-project/install-app.sh"
+      - name: Install app on the server (preserves existing .env)
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
+            if [ -f ~/team-project/.env ]; then
+              echo 'Preserving existing .env on VM'
+            else
+              cp team-project/.env ~/team-project/.env
+            fi
+            sh team-project/install-app.sh
+          "
 
       - name: Deploy and clean Docker
         run: |
