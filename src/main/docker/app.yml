@@ -1,4 +1,4 @@
-# This configuration is intended for development purpose, it's **your** responsibility to harden it for production
+# This configuration is intended for development purpos, it's **your** responsibility to harden it for production
 name: mailmerge
 services:
   app:
