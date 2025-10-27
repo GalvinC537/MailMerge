@@ -147,16 +147,10 @@ jobs:
       - name: Transfer files to the server
         run: scp -o StrictHostKeyChecking=no -r src/main/docker/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}:~/team-project
 
-      - name: Install app on the server (preserves existing .env)
+      # Run app installation on the VM
+      - name: Install app on the server
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
-            if [ -f ~/team-project/.env ]; then
-              echo 'Preserving existing .env on VM'
-            else
-              cp team-project/.env ~/team-project/.env
-            fi
-            sh team-project/install-app.sh
-          "
+          ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "sh team-project/install-app.sh"
 
       - name: Deploy and clean Docker
         run: |

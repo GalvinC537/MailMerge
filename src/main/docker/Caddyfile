@@ -18,7 +18,7 @@ After a tagged commit has deployed, wait 30 seconds and refresh this page.
 
 If still not live, login to the VM via SSH and try to debug using 'docker compose -f ~/team-project/prd.yml up'"
     }
-    reverse_proxy http://teamproject-prd:8080
+    reverse_proxy http://mailmerge-prd:8080
 }
 
 # === Development site ===
@@ -30,7 +30,7 @@ After a commit to the main branch has deployed, wait 30 seconds and refresh this
 
 If still not live, login to the VM via SSH and try to debug using 'docker compose -f ~/team-project/dev.yml up'"
     }
-    reverse_proxy http://teamproject-dev:8080
+    reverse_proxy http://mailmerge-dev:8080
 }
 
 # === Default landing page (for IP access) ===

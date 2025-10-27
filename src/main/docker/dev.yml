@@ -1,5 +1,5 @@
 services:
-  mailmerge-app:
+  mailmerge-dev:
     image: "${CI_REGISTRY_IMAGE}:latest"
     restart: always
     environment:
