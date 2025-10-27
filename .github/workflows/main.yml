@@ -4,10 +4,8 @@ jobs:
   publish-docker:
     name: Publish Docker
     if: contains(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/')
-    concurrency: # Ensures only one deploy job runs at a time
+    concurrency:
       group: deployment
-    #runs-on: self-hosted means you need to set up self-hosted runners to run this job
-    #see https://docs.github.com/en/actions/hosting-your-own-runners/managing-self-hosted-runners/about-self-hosted-runners
     runs-on: self-hosted
     permissions:
       contents: read
@@ -38,10 +36,10 @@ jobs:
           done
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v2
+        uses: docker/setup-buildx-action@v3
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v2
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -67,14 +65,22 @@ jobs:
           key: node_modules-${{ hashFiles('**/package-lock.json') }}
           restore-keys: node_modules-
 
+      # ✅ New step: compute lowercase owner and repo
+      - name: Compute lowercase owner and repo
+        run: |
+          echo "OWNER_LC=${GITHUB_REPOSITORY_OWNER,,}" >> $GITHUB_ENV
+          echo "REPO_NAME=${GITHUB_REPOSITORY##*/}" >> $GITHUB_ENV
+          echo "REPO_LC=${REPO_NAME,,}" >> $GITHUB_ENV
+
+      # ✅ Fixed step: use lowercase image name (no uppercase, no duplicates)
       - name: Build and push Docker image to ghcr
         run: |
-          echo "pushing ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:${{ github.sha }}"
+          echo "pushing ghcr.io/${OWNER_LC}/${REPO_LC}:${GITHUB_SHA}"
           ./mvnw -ntp clean compile jib:build -DskipTests -Pprod \
-            -Djib.to.auth.username=${{ github.actor }} \
+            -Djib.to.auth.username=${GITHUB_ACTOR} \
             -Djib.to.auth.password=${{ secrets.GITHUB_TOKEN }} \
-            -Djib.to.image=ghcr.io/${{ github.repository_owner }}/${{ github.repository }}:${{ github.sha }} \
-            -Djib.to.tags=latest \
+            -Djib.to.image=ghcr.io/${OWNER_LC}/${REPO_LC} \
+            -Djib.to.tags=latest,${GITHUB_SHA} \
             -Dmaven.repo.local=$MAVEN_USER_HOME
         env:
           MAVEN_USER_HOME: ~/.m2/repository
@@ -83,47 +89,43 @@ jobs:
     name: deploy development app via ssh
     runs-on: self-hosted
     needs: publish-docker
-    #if: success() means previous stages must pass;
     if: success() && ( contains(github.ref, 'refs/heads/main') || startsWith(github.ref, 'refs/tags/') )
-    concurrency: # Ensures only one deploy job runs at a time
+    concurrency:
       group: deployment
 
     env:
       RSA_PRIVATE_KEY: ${{secrets.RSA_PRIVATE_KEY}}
-      URL: '${{ github.event.repository.name }}.bham.team' # URL as per project name
-      DEVURL: '${{ github.event.repository.name }}.dev.bham.team' # URL as per project name
+      URL: '${{ github.event.repository.name }}.bham.team'
+      DEVURL: '${{ github.event.repository.name }}.dev.bham.team'
       ACME: 'https://acme-v02.api.letsencrypt.org/directory'
       ACME_STAGING: 'https://acme-staging-v02.api.letsencrypt.org/directory'
-      CI_REGISTRY_USER: ${{ github.actor }} # GitHub username for authentication
-      CI_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }} # GitHub token to authenticate to GHCR
-      CI_REGISTRY_IMAGE: ghcr.io/${{ github.repository_owner }}/${{ github.repository }} # GHCR image URL
-      CI_REGISTRY: ghcr.io # GHCR registry URL
+      CI_REGISTRY_USER: ${{ github.actor }}
+      CI_REGISTRY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
+      # ✅ Fixed to use lowercase env vars created earlier
+      CI_REGISTRY_IMAGE: ghcr.io/${{ env.OWNER_LC }}/${{ env.REPO_LC }}
+      CI_REGISTRY: ghcr.io
 
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up SSH key for connection
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "$RSA_PRIVATE_KEY" > ~/.ssh/id_rsa  # Add private key (stored in GitHub Secrets)
+          echo "$RSA_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          eval $(ssh-agent -s)  # Start SSH agent
-          ssh-add ~/.ssh/id_rsa  # Add the private key to the agent
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
 
-      # Add known hosts to prevent SSH from asking to verify the host
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ secrets.DEPLOY_IP }} >> ~/.ssh/known_hosts
 
-      # Save CI pipeline variables ready for transfer
       - name: Save CI variables for transfer
         run: |
           echo CI_REGISTRY_USER=${{ env.CI_REGISTRY_USER }} \
                CI_REGISTRY_PASSWORD=${{ env.CI_REGISTRY_PASSWORD }} \
-               CI_REGISTRY_IMAGE=${{ env.CI_REGISTRY_IMAGE }} \
+               CI_REGISTRY_IMAGE=ghcr.io/${OWNER_LC}/${REPO_LC} \
                CI_COMMIT_TAG=${{ github.sha }} \
                CI_REGISTRY=${{ env.CI_REGISTRY }} \
                ACME=${{ env.ACME_STAGING }} \
@@ -132,7 +134,6 @@ jobs:
                DEPLOY_IP=${{ secrets.DEPLOY_IP }} \
                EMAIL=${{ github.event.head_commit.author.email }} > src/main/docker/.env
 
-      # SSH into the VM and ensure Docker is installed, delete previous folder
       - name: Install Docker and prepare the server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
@@ -140,17 +141,14 @@ jobs:
             which docker || sh team-project/install-docker.sh
           "
 
-      # Transfer the necessary files to the VM
       - name: Transfer files to the server
         run: |
           scp -o StrictHostKeyChecking=no -r src/main/docker/ ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }}:~/team-project
 
-      # Run app installation on the VM
       - name: Install app on the server
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "sh team-project/install-app.sh"
 
-      # Deploy the app and clean up Docker system
       - name: Deploy and clean Docker
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
@@ -163,33 +161,27 @@ jobs:
     runs-on: self-hosted
     needs: deploy-dev
     if: success() && startsWith(github.ref, 'refs/tags/')
-
-    concurrency: # Ensures only one deploy job runs at a time
+    concurrency:
       group: deployment
-
     env:
       RSA_PRIVATE_KEY: ${{secrets.RSA_PRIVATE_KEY}}
 
     steps:
-      # Checkout repository
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # Set up SSH key for connection
       - name: Set up SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "$RSA_PRIVATE_KEY" > ~/.ssh/id_rsa  # Add private key (stored in GitHub Secrets)
+          echo "$RSA_PRIVATE_KEY" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-          eval $(ssh-agent -s)  # Start SSH agent
-          ssh-add ~/.ssh/id_rsa  # Add the private key to the agent
+          eval $(ssh-agent -s)
+          ssh-add ~/.ssh/id_rsa
 
-      # Add known hosts to prevent  from asking to verify the host
       - name: Add SSH known hosts
         run: |
           ssh-keyscan -H ${{ secrets.DEPLOY_IP }} >> ~/.ssh/known_hosts
 
-      # Deploy the production application using Docker Compose
       - name: Deploy to production
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_IP }} "
