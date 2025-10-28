@@ -81,12 +81,13 @@ spring:
       indent-output: true
   datasource:
     type: com.zaxxer.hikari.HikariDataSource
-    url: jdbc:h2:file:./target/h2db/db/mailmerge;DB_CLOSE_DELAY=-1
+    url: jdbc:postgresql://mailmerge-postgresql:5432/mailmerge
     username: mailmerge
     password:
     hikari:
       poolName: Hikari
       auto-commit: false
+
   h2:
     console:
       # JHipster uses a custom h2-console initializer
