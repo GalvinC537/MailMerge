@@ -101,12 +101,11 @@ public class WebConfigurer implements ServletContextInitializer, WebServerFactor
     }
 
     private boolean h2ConsoleIsEnabled(Environment env) {
-        return (
-            env.acceptsProfiles(Profiles.of(JHipsterConstants.SPRING_PROFILE_DEVELOPMENT)) &&
-            "true".equals(env.getProperty("spring.h2.console.enabled"))
-        );
+        // Only enable if explicitly true in config
+        return env.acceptsProfiles(Profiles.of(JHipsterConstants.SPRING_PROFILE_DEVELOPMENT))
+            && Boolean.TRUE.equals(env.getProperty("spring.h2.console.enabled", Boolean.class, false));
     }
-
+    
     /**
      * Initializes H2 console.
      */
