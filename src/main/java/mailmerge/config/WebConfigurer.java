@@ -46,9 +46,9 @@ public class WebConfigurer implements ServletContextInitializer, WebServerFactor
             LOG.info("Web application configuration, using profiles: {}", (Object[]) env.getActiveProfiles());
         }
 
-       // if (h2ConsoleIsEnabled(env)) {
-         //   initH2Console(servletContext);
-        //}
+        if (h2ConsoleIsEnabled(env)) {
+            initH2Console(servletContext);
+        }
         LOG.info("Web application fully configured");
     }
 
@@ -101,9 +101,10 @@ public class WebConfigurer implements ServletContextInitializer, WebServerFactor
     }
 
     private boolean h2ConsoleIsEnabled(Environment env) {
-        // Only enable if explicitly true in config
-        return env.acceptsProfiles(Profiles.of(JHipsterConstants.SPRING_PROFILE_DEVELOPMENT))
-            && Boolean.TRUE.equals(env.getProperty("spring.h2.console.enabled", Boolean.class, false));
+        return (
+            env.acceptsProfiles(Profiles.of(JHipsterConstants.SPRING_PROFILE_DEVELOPMENT)) &&
+            "true".equals(env.getProperty("spring.h2.console.enabled"))
+        );
     }
 
     /**
