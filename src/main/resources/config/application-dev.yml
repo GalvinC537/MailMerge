@@ -90,7 +90,7 @@ spring:
   h2:
     console:
       # JHipster uses a custom h2-console initializer
-      enabled: true
+      enabled: false
   liquibase:
     # Remove 'faker' if you do not want the sample data to be loaded automatically
     contexts: dev, faker
