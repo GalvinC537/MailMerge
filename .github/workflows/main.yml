@@ -137,7 +137,7 @@ jobs:
             "ghcr.io/${OWNER_LC}/${REPO_LC}" \
             "${{ github.sha }}" \
             "${{ env.CI_REGISTRY }}" \
-            "${{ env.ACME_STAGING }}" \
+            "${{ env.ACME }}" \
             "${{ env.DEVURL }}" \
             "${{ env.URL }}" \
             "${{ secrets.DEPLOY_IP }}" \
