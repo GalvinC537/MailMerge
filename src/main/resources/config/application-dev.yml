@@ -2,25 +2,39 @@
 # Spring Boot configuration for the "dev" profile.
 #
 # This configuration overrides the application.yml file.
-#
-# More information on profiles: https://www.jhipster.tech/profiles/
-# More information on configuration properties: https://www.jhipster.tech/common-application-properties/
-# ===================================================================
-
-# ===================================================================
-# Standard Spring Boot properties.
-# Full reference is available at:
-# http://docs.spring.io/spring-boot/docs/current/reference/html/common-application-properties.html
 # ===================================================================
 
 logging:
   level:
     ROOT: DEBUG
     tech.jhipster: DEBUG
-    org.hibernate.SQL: DEBUG
     mailmerge: DEBUG
 
+management:
+  prometheus:
+    metrics:
+      export:
+        enabled: false
+
 spring:
+  devtools:
+    restart:
+      enabled: false
+    livereload:
+      enabled: false
+  datasource:
+    type: com.zaxxer.hikari.HikariDataSource
+    url: jdbc:postgresql://localhost:5432/mailmerge
+    username: mailmerge
+    password: password
+    hikari:
+      poolName: Hikari
+      auto-commit: false
+  liquibase:
+    contexts: dev
+  thymeleaf:
+    cache: false
+
   security:
     oauth2:
       client:
@@ -38,13 +52,13 @@ spring:
               - offline_access
               - Mail.Send
 
-            # ALIAS so the default JHipster link /oauth2/authorization/oidc still works
+          # optional alias (if JHipster expects /oidc too)
           oidc:
-            provider: azure    # <-- IMPORTANT: reuse the 'azure' provider, NOT 'oidc'
+            provider: azure
             client-id: ${AZURE_CLIENT_ID}
             client-secret: ${AZURE_CLIENT_SECRET}
             authorization-grant-type: authorization_code
-            redirect-uri: "https://mailmerge.dev.bham.team/login/oauth2/code/azure"
+            redirect-uri: "https://mailmerge.dev.bham.team/login/oauth2/code/oidc"
             scope:
               - openid
               - profile
@@ -53,94 +67,35 @@ spring:
               - Mail.Send
 
         provider:
-          # Provider actually used by both registrations (explicit endpoints, no issuer-uri)
           azure:
             authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
             token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
             jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
             user-info-uri: https://graph.microsoft.com/oidc/userinfo
             user-name-attribute: sub
-
-          # Placeholder ONLY so JHipster's SecurityConfiguration can read this property.
-          # No registration points to provider 'oidc', so Spring won't try to parse it.
           oidc:
             issuer-uri: https://login.microsoftonline.com/organizations/v2.0
-  devtools:
-    restart:
-      enabled: true
-      additional-exclude: static/**,.h2.server.properties
-    livereload:
-      enabled: false # we use Webpack dev server + BrowserSync for livereload
-  docker:
-    compose:
-      enabled: false
-      profiles:
-        active: dev
-  jackson:
-    serialization:
-      indent-output: true
-  datasource:
-    type: com.zaxxer.hikari.HikariDataSource
-    url: jdbc:postgresql://mailmerge-postgresql:5432/mailmerge
-    username: mailmerge
-    password:
-    hikari:
-      poolName: Hikari
-      auto-commit: false
-
-  h2:
-    console:
-      # JHipster uses a custom h2-console initializer
-      enabled: false
-  liquibase:
-    # Remove 'faker' if you do not want the sample data to be loaded automatically
-    contexts: dev, faker
-  messages:
-    cache-duration: PT1S # 1 second, see the ISO 8601 standard
-  thymeleaf:
-    cache: false
 
 server:
   port: 8080
-  # make sure requests the proxy uri instead of the server one
-  forward-headers-strategy: native
-
-# ===================================================================
-# JHipster specific properties
-#
-# Full reference is available at: https://www.jhipster.tech/common-application-properties/
-# ===================================================================
+  shutdown: graceful
+  compression:
+    enabled: true
+    mime-types: text/html,text/xml,text/plain,text/css,application/javascript,application/json,image/svg+xml
+    min-response-size: 1024
 
 jhipster:
-  cache: # Cache configuration
-    ehcache: # Ehcache configuration
-      time-to-live-seconds: 3600 # By default objects stay 1 hour in the cache
-      max-entries: 100 # Number of objects in each cache entry
-  # CORS is only enabled by default with the "dev" profile
-  cors:
-    # Allow Ionic for JHipster by default (* no longer allowed in Spring Boot 2.4+)
-    allowed-origins: 'http://localhost:8100,https://localhost:8100,http://localhost:9000,https://localhost:9000,http://localhost:4200,https://localhost:4200'
-    # Enable CORS when running in GitHub Codespaces
-    allowed-origin-patterns: 'https://*.githubpreview.dev'
-    allowed-methods: '*'
-    allowed-headers: '*'
-    exposed-headers: 'Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params'
-    allow-credentials: true
-    max-age: 1800
+  http:
+    cache:
+      timeToLiveInDays: 1461
+  cache:
+    ehcache:
+      time-to-live-seconds: 3600
+      max-entries: 1000
   logging:
-    use-json-format: false # By default, logs are not in Json format
-    logstash: # Forward logs to logstash over a socket, used by LoggingConfiguration
+    use-json-format: false
+    logstash:
       enabled: false
       host: localhost
       port: 5000
       ring-buffer-size: 512
-# ===================================================================
-# Application specific properties
-# Add your own application properties here, see the ApplicationProperties class
-# to have type-safe configuration, like in the JHipsterProperties above
-#
-# More documentation is available at:
-# https://www.jhipster.tech/common-application-properties/
-# ===================================================================
-
-# application:
