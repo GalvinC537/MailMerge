@@ -5,13 +5,6 @@
 # for example application-dev.yml if you use the "dev" profile.
 #
 # More information on profiles: https://www.jhipster.tech/profiles/
-# More information on configuration properties: https://www.jhipster.tech/common-application-properties/
-# ===================================================================
-
-# ===================================================================
-# Standard Spring Boot properties.
-# Full reference is available at:
-# http://docs.spring.io/spring-boot/docs/current/reference/html/common-application-properties.html
 # ===================================================================
 
 ---
@@ -62,7 +55,7 @@ management:
       enabled: true
   health:
     mail:
-      enabled: false # When using the MailService, configure an SMTP server and set this to true
+      enabled: false
   prometheus:
     metrics:
       export:
@@ -93,28 +86,28 @@ management:
 spring:
   application:
     name: mailmerge
+
   docker:
     compose:
-      enabled: true
+      enabled: false
       lifecycle-management: start-only
       file: src/main/docker/services.yml
+
   profiles:
-    # The commented value for `active` can be replaced with valid Spring profiles to load.
-    # Otherwise, it will be filled in by maven when building the JAR file
-    # Either way, it can be overridden by `--spring.profiles.active` value passed in the commandline or `-Dspring.profiles.active` set in `JAVA_OPTS`
     active: '@spring.profiles.active@'
     group:
       dev:
         - dev
         - api-docs
-        # Uncomment to activate TLS for the dev profile
-        #- tls
+
   jmx:
     enabled: false
+
   data:
     jpa:
       repositories:
         bootstrap-mode: deferred
+
   jpa:
     open-in-view: false
     properties:
@@ -126,7 +119,6 @@ spring:
       hibernate.cache.use_second_level_cache: true
       hibernate.cache.use_query_cache: false
       hibernate.generate_statistics: false
-      # modify batch size as necessary
       hibernate.jdbc.batch_size: 25
       hibernate.order_inserts: true
       hibernate.order_updates: true
@@ -137,13 +129,17 @@ spring:
       naming:
         physical-strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
         implicit-strategy: org.springframework.boot.orm.jpa.hibernate.SpringImplicitNamingStrategy
+
   messages:
     basename: i18n/messages
+
   main:
     allow-bean-definition-overriding: true
+
   mvc:
     problemdetails:
       enabled: true
+
   security:
     oauth2:
       client:
@@ -153,41 +149,35 @@ spring:
             client-id: ${AZURE_CLIENT_ID}
             client-secret: ${AZURE_CLIENT_SECRET}
             authorization-grant-type: authorization_code
-            redirect-uri: "{baseUrl}/login/oauth2/code/azure"
+            redirect-uri: "http://localhost:8080/login/oauth2/code/azure"
             scope:
               - openid
               - profile
               - email
               - offline_access
               - Mail.Send
-
-            # ALIAS so the default JHipster link /oauth2/authorization/oidc still works
           oidc:
-            provider: azure    # <-- IMPORTANT: reuse the 'azure' provider, NOT 'oidc'
+            provider: azure
             client-id: ${AZURE_CLIENT_ID}
             client-secret: ${AZURE_CLIENT_SECRET}
             authorization-grant-type: authorization_code
-            redirect-uri: "{baseUrl}/login/oauth2/code/oidc"
+            redirect-uri: "http://localhost:8080/login/oauth2/code/oidc"
             scope:
               - openid
               - profile
               - email
               - offline_access
               - Mail.Send
-
         provider:
-          # Provider actually used by both registrations (explicit endpoints, no issuer-uri)
           azure:
             authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
             token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
             jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
             user-info-uri: https://graph.microsoft.com/oidc/userinfo
             user-name-attribute: sub
-
-          # Placeholder ONLY so JHipster's SecurityConfiguration can read this property.
-          # No registration points to provider 'oidc', so Spring won't try to parse it.
           oidc:
             issuer-uri: https://login.microsoftonline.com/organizations/v2.0
+
   task:
     execution:
       thread-name-prefix: mailmerge-task-
@@ -199,11 +189,28 @@ spring:
       thread-name-prefix: mailmerge-scheduling-
       pool:
         size: 2
+
   thymeleaf:
     mode: HTML
+
   output:
     ansi:
       console-available: true
+
+  # ===================================================================
+  # Local fallback (only used when no profile is active)
+  # ===================================================================
+  liquibase:
+    enabled: false
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
 
 server:
   servlet:
@@ -214,28 +221,12 @@ server:
 springdoc:
   show-actuator: true
 
-# Properties to be exposed on the /info management endpoint
 info:
-  # Comma separated list of profiles that will trigger the ribbon to show
   display-ribbon-on-profiles: 'dev'
-
-# ===================================================================
-# JHipster specific properties
-#
-# Full reference is available at: https://www.jhipster.tech/common-application-properties/
-# ===================================================================
 
 jhipster:
   clientApp:
     name: 'mailmergeApp'
-  # By default CORS is disabled. Uncomment to enable.
-  # cors:
-  #   allowed-origins: "http://localhost:8100,http://localhost:9000"
-  #   allowed-methods: "*"
-  #   allowed-headers: "*"
-  #   exposed-headers: "Authorization,Link,X-Total-Count,X-${jhipster.clientApp.name}-alert,X-${jhipster.clientApp.name}-error,X-${jhipster.clientApp.name}-params"
-  #   allow-credentials: true
-  #   max-age: 1800
   mail:
     from: mailmerge@localhost
   api-docs:
@@ -244,25 +235,10 @@ jhipster:
     title: Mailmerge API
     description: Mailmerge API documentation
     version: 0.0.1
-    terms-of-service-url:
-    contact-name:
-    contact-url:
-    contact-email:
-    license: unlicensed
-    license-url:
   security:
     content-security-policy: "default-src 'self'; frame-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://storage.googleapis.com; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
     oauth2:
       audience:
         - account
         - api://default
-# ===================================================================
-# Application specific properties
-# Add your own application properties here, see the ApplicationProperties class
-# to have type-safe configuration, like in the JHipsterProperties above
-#
-# More documentation is available at:
-# https://www.jhipster.tech/common-application-properties/
-# ===================================================================
 
-# application:
