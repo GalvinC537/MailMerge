@@ -8,6 +8,20 @@
 
     <p class="lead">This is your homepage</p>
 
+    <div class="mt-4">
+      <button
+        class="btn btn-primary"
+        [disabled]="sending()"
+        (click)="sendTestEmail()"
+      >
+        {{ sending() ? 'Sending…' : 'Send Test Email via Graph' }}
+      </button>
+
+      <span *ngIf="sendOk()" class="text-success ms-2">✅ Sent!</span>
+      <span *ngIf="sendErr()" class="text-danger ms-2">❌ Failed — check logs</span>
+    </div>
+
+
     <div>
       @if (account() !== null) {
         <div class="alert alert-success">

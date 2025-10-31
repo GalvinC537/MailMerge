@@ -1,0 +1,95 @@
+# ===================================================================
+# Local Spring Boot configuration
+# Used for running the application locally without Docker or Postgres.
+# ===================================================================
+
+spring:
+  application:
+    name: mailmerge
+
+  # Disable Liquibase and Docker Compose for local testing
+  liquibase:
+    enabled: false
+  docker:
+    compose:
+      enabled: false
+
+  # Use in-memory H2 database
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+  # Standard JPA / Hibernate settings
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.H2Dialect
+        format_sql: true
+        jdbc:
+          time_zone: UTC
+
+  # Local OAuth configuration using Azure AD
+  security:
+    oauth2:
+      client:
+        registration:
+          azure:
+            provider: azure
+            client-id: ${AZURE_CLIENT_ID}
+            client-secret: ${AZURE_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "http://localhost:8080/login/oauth2/code/azure"
+            scope:
+              - openid
+              - profile
+              - email
+              - offline_access
+              - Mail.Send
+          oidc:
+            provider: azure
+            client-id: ${AZURE_CLIENT_ID}
+            client-secret: ${AZURE_CLIENT_SECRET}
+            authorization-grant-type: authorization_code
+            redirect-uri: "http://localhost:8080/login/oauth2/code/oidc"
+            scope:
+              - openid
+              - profile
+              - email
+              - offline_access
+              - Mail.Send
+        provider:
+          azure:
+            authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
+            token-uri: https://login.microsoftonline.com/common/oauth2/v2.0/token
+            jwk-set-uri: https://login.microsoftonline.com/common/discovery/v2.0/keys
+            user-info-uri: https://graph.microsoft.com/oidc/userinfo
+            user-name-attribute: sub
+          oidc:
+            issuer-uri: https://login.microsoftonline.com/organizations/v2.0
+
+# Prevent Spring from rewriting redirect URIs via proxy headers
+server:
+  port: 8080
+  forward-headers-strategy: none
+  servlet:
+    session:
+      cookie:
+        http-only: true
+
+# Basic JHipster info
+jhipster:
+  clientApp:
+    name: 'mailmergeApp'
+  mail:
+    from: mailmerge@localhost
+  security:
+    content-security-policy: "default-src 'self'; frame-src 'self' data:; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self' data:"
