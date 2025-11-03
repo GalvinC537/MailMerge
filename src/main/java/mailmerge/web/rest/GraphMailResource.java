@@ -25,7 +25,7 @@ public class GraphMailResource {
     @PostMapping("/send-test-email")
     public ResponseEntity<Void> sendTestEmail(Authentication authentication) {
         // Replace this with your email for testing
-        String myEmail = "Lin1@hotmail.co.uk";
+        String myEmail = "GalvinC03@gmail.com";
         graphMailService.sendTestEmail(myEmail);
         return ResponseEntity.noContent().build();
     }
