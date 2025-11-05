@@ -8,21 +8,122 @@
 
     <p class="lead">This is your homepage</p>
 
+    <!-- Single email section -->
     <div class="mt-4">
-      <button
-        class="btn btn-primary"
-        [disabled]="sending()"
-        (click)="sendTestEmail()"
-      >
-        {{ sending() ? 'Sending…' : 'Send Test Email via Graph' }}
-      </button>
+      <h4>Send a single email via Microsoft Graph</h4>
 
-      <span *ngIf="sendOk()" class="text-success ms-2">✅ Sent!</span>
-      <span *ngIf="sendErr()" class="text-danger ms-2">❌ Failed — check logs</span>
+      <form (ngSubmit)="sendEmail()" #mailForm="ngForm">
+        <div class="mb-3">
+          <label for="to" class="form-label">Recipient email</label>
+          <input
+            id="to"
+            name="to"
+            class="form-control"
+            type="email"
+            required
+            [(ngModel)]="emailForm.to"
+          />
+        </div>
+
+        <div class="mb-3">
+          <label for="subject" class="form-label">Subject</label>
+          <input
+            id="subject"
+            name="subject"
+            class="form-control"
+            type="text"
+            required
+            [(ngModel)]="emailForm.subject"
+          />
+        </div>
+
+        <div class="mb-3">
+          <label for="body" class="form-label">Email content</label>
+          <textarea
+            id="body"
+            name="body"
+            class="form-control"
+            rows="5"
+            required
+            [(ngModel)]="emailForm.body"
+          ></textarea>
+        </div>
+
+        <button
+          type="submit"
+          class="btn btn-primary"
+          [disabled]="mailForm.invalid || sending()"
+        >
+          {{ sending() ? 'Sending…' : 'Send Email via Graph' }}
+        </button>
+      </form>
+
+      <div *ngIf="sendOk()" class="text-success mt-2">✅ Sent!</div>
+      <div *ngIf="sendErr()" class="text-danger mt-2">❌ Failed — check logs</div>
     </div>
 
+    <!-- Mail merge section -->
+    <div class="mt-5">
+      <h4>Mail merge from Excel</h4>
+      <p class="small text-muted">
+        Upload an Excel file with a header row. Must include a column named <code>email</code>.
+        You can use placeholders like <code>{{'{{name}}'}}</code> or <code>{{'{{course}}'}}</code> in the templates below.
+      </p>
 
-    <div>
+      <form (ngSubmit)="sendMailMerge()" #mergeForm="ngForm">
+        <div class="mb-3">
+          <label for="mergeFile" class="form-label">Excel file (.xlsx)</label>
+          <input
+            id="mergeFile"
+            type="file"
+            class="form-control"
+            (change)="onMergeFileChange($event)"
+            required
+          />
+        </div>
+
+        <div class="mb-3">
+          <label for="mergeSubject" class="form-label">Subject template</label>
+          <input
+            id="mergeSubject"
+            name="mergeSubject"
+            class="form-control"
+            type="text"
+            required
+            [(ngModel)]="mergeSubjectTemplate"
+          />
+        </div>
+
+        <div class="mb-3">
+          <label for="mergeBody" class="form-label">Body template</label>
+          <textarea
+            id="mergeBody"
+            name="mergeBody"
+            class="form-control"
+            rows="6"
+            required
+            [(ngModel)]="mergeBodyTemplate"
+          ></textarea>
+        </div>
+
+        <button
+          type="submit"
+          class="btn btn-secondary"
+          [disabled]="mergeSending() || !mergeFile"
+        >
+          {{ mergeSending() ? 'Sending merge…' : 'Run mail merge' }}
+        </button>
+      </form>
+
+      <div *ngIf="mergeOk()" class="text-success mt-2">
+        ✅ Mail merge completed (check your recipients’ inboxes).
+      </div>
+      <div *ngIf="mergeErr()" class="text-danger mt-2">
+        ❌ Mail merge failed — check server logs.
+      </div>
+    </div>
+
+    <div class="mt-4">
       @if (account() !== null) {
         <div class="alert alert-success">
           @if (account(); as accountRef) {
@@ -34,9 +135,9 @@
           <span>If you want to </span>
           <a class="alert-link" (click)="login()">sign in</a
           ><span
-            >, you can try the default accounts:<br />- Administrator (login=&quot;admin&quot; and password=&quot;admin&quot;) <br />- User
-            (login=&quot;user&quot; and password=&quot;user&quot;).</span
-          >
+        >, you can try the default accounts:<br />- Administrator (login=&quot;admin&quot; and password=&quot;admin&quot;)
+            <br />- User (login=&quot;user&quot; and password=&quot;user&quot;).</span
+        >
         </div>
       }
     </div>
@@ -50,11 +151,13 @@
       </li>
       <li>
         <a href="https://github.com/jhipster/generator-jhipster/issues?state=open" target="_blank" rel="noopener noreferrer"
-          >JHipster bug tracker</a
+        >JHipster bug tracker</a
         >
       </li>
       <li>
-        <a href="https://gitter.im/jhipster/generator-jhipster" target="_blank" rel="noopener noreferrer">JHipster public chat room</a>
+        <a href="https://gitter.im/jhipster/generator-jhipster" target="_blank" rel="noopener noreferrer">
+          JHipster public chat room
+        </a>
       </li>
       <li><a href="https://twitter.com/jhipster" target="_blank" rel="noopener noreferrer">follow &#64;jhipster on Twitter</a></li>
     </ul>
