@@ -107,7 +107,8 @@ public class MailMergeService {
 
         Pattern pattern = Pattern.compile("\\{\\{\\s*(\\w+)\\s*\\}\\}");
         Matcher matcher = pattern.matcher(template);
-        StringBuffer sb = new StringBuffer();
+        StringBuilder sb = new StringBuilder();
+
 
         while (matcher.find()) {
             String key = matcher.group(1);
