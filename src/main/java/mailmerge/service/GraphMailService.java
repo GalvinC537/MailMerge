@@ -1,17 +1,17 @@
-
-//Sends the actual email via Graph API
-
-
 package mailmerge.service;
 
-import java.util.Map;
-
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
+import java.util.Map;
+
 @Service
 public class GraphMailService {
+
+    private static final Logger log = LoggerFactory.getLogger(GraphMailService.class);
 
     private final WebClient graphWebClient;
 
@@ -19,35 +19,34 @@ public class GraphMailService {
         this.graphWebClient = graphWebClient;
     }
 
-    /**
-     * Sends a simple hardcoded test email to verify Microsoft Graph setup.
-     */
-    public void sendTestEmail(String toAddress) {
-        Map<String, Object> payload = Map.of(
+    public void sendMail(String to, String subject, String body) {
+        log.info("Sending email to {}", to);
+
+        // Build message payload for Microsoft Graph
+        Map<String, Object> message = Map.of(
             "message", Map.of(
-                "subject", "Hello world (Graph API Test)",
+                "subject", subject,
                 "body", Map.of(
-                    "contentType", "Text",
-                    "content", "This is a test email sent via Microsoft Graph API from the JHipster app. 🎉"
+                    "contentType", "HTML",
+                    "content", body
                 ),
                 "toRecipients", new Object[]{
-                    Map.of("emailAddress", Map.of("address", toAddress))
+                    Map.of("emailAddress", Map.of("address", to))
                 }
             ),
             "saveToSentItems", true
         );
 
+        // Call Microsoft Graph API
         graphWebClient
             .post()
             .uri("/me/sendMail")
-            .bodyValue(payload)
+            .bodyValue(message)
             .retrieve()
             .toBodilessEntity()
-            .onErrorResume(e -> {
-                e.printStackTrace(); // helpful for debugging if API call fails
-                return Mono.empty();
-            })
-            .block(); // blocking is fine for a single call
+            .doOnSuccess(v -> log.info("Email sent successfully"))
+            .doOnError(e -> log.error("Failed to send email: {}", e.getMessage()))
+            .onErrorResume(e -> Mono.empty()) // prevents crash if send fails
+            .block(); // executes synchronously
     }
 }
-

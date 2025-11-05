@@ -1,33 +1,30 @@
-
-//REST controller — exposes /api/graph/send-test-email endpoint for the frontend
-
-
 package mailmerge.web.rest;
 
 import mailmerge.service.GraphMailService;
+import mailmerge.service.dto.GraphMailDTO;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/graph")
+@RequestMapping("/api/graph-mail")
 public class GraphMailResource {
 
+    private final Logger log = LoggerFactory.getLogger(GraphMailResource.class);
     private final GraphMailService graphMailService;
 
     public GraphMailResource(GraphMailService graphMailService) {
         this.graphMailService = graphMailService;
     }
 
-    /**
-     * POST /api/graph/send-test-email : Sends a hardcoded email to your inbox.
-     */
-    @PostMapping("/send-test-email")
-    public ResponseEntity<Void> sendTestEmail(Authentication authentication) {
-        // Replace this with your email for testing
-        String myEmail = "GalvinC03@gmail.com";
-        graphMailService.sendTestEmail(myEmail);
-        return ResponseEntity.noContent().build();
+    @PostMapping("/send")
+    public ResponseEntity<Void> sendMail(@RequestBody GraphMailDTO mailRequest) {
+        log.debug("REST request to send email via Graph API: {}", mailRequest);
+        graphMailService.sendMail(mailRequest.getTo(), mailRequest.getSubject(), mailRequest.getBody());
+        return ResponseEntity.ok().build();
     }
 }
+
+
 
