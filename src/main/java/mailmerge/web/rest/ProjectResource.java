@@ -185,12 +185,9 @@ public class ProjectResource {
     ) {
         LOG.debug("REST request to update project {} to status {}", id, status);
 
-        Optional<ProjectDTO> optionalProject = projectService.findOne(id);
-        if (optionalProject.isEmpty()) {
-            return ResponseEntity.notFound().build();
-        }
+        ProjectDTO project = projectService.findOne(id)
+            .orElseThrow(() -> new BadRequestAlertException("Project not found", ENTITY_NAME, "idnotfound"));
 
-        ProjectDTO project = optionalProject.get();
 
         // Update status safely
         project.setStatus(Enum.valueOf(mailmerge.domain.enumeration.EmailStatus.class, status.toUpperCase()));
