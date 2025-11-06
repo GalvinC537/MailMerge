@@ -1,7 +1,7 @@
 // Global options
 service * with serviceClass // For every entity create a service.java folder
 dto * with mapstruct // generate DTOs for every entity, using MapStruct to convert between them and the entities
-paginate Email, Project with pagination // Helps prevent performance issues when we have high amount of emails
+paginate Project with pagination // Helps prevent performance issues when we have high amount of emails
 filter * // Adds a filtering layer
 
 enum EmailStatus {
@@ -12,26 +12,21 @@ enum EmailStatus {
 
 // This entity is for the Users Project
 entity Project {
-  name String required minlength(1)
-  spreadsheetLink String required  // Blob/URL or object key
+  name String required minlength(1) // name of project
+  spreadsheetLink String  // Blob/URL or object key
+  header TextBlob // header for the email
+  content TextBlob // This is the actual email
+  status EmailStatus //PENDING/ SENT/FAILED
+  sentAt Instant // Time it was sent
 }
 
-// This entity is used to store all the emails which have been created
-// Remember going to have to return error if no field "email" in spreadsheet
-entity Email {
-  emailAddress String required // receiver email address
-  content TextBlob required // This is the actual email
-  variablesJson TextBlob // store row data: {"firstName":"Conor", ...}
-  status EmailStatus required // PENDING/ SENT/FAILED
-  sentAt Instant // When the email was sent
-}
 
 entity Attachment {
   content String
 }
 
 entity Heading {
-  name String required // example: firstname
+  name String // example: firstname
 }
 
 // Relationships
@@ -42,9 +37,8 @@ relationship ManyToOne {
 }
 
 relationship OneToMany {
-  Project{emails} to Email{project} // One project can have many emails
   Project{headings} to Heading{project} // One project can have many headings
-  Email{attachments} to Attachment{email} // One email can have many attachments
+  Project{attachments} to Attachment{project} // One project can have many attachments
 }
 
 

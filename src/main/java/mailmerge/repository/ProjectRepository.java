@@ -1,3 +1,5 @@
+//called by ProjectService.java and this communicates with the database
+
 package mailmerge.repository;
 
 import java.util.List;
@@ -10,12 +12,17 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 /**
- * Spring Data JPA repository for the Project entity.
+ * Spring Data JPA repository for the Project entity. Remember normal queries like delete are in the extends Jpa Repository
  */
 @Repository
 public interface ProjectRepository extends JpaRepository<Project, Long>, JpaSpecificationExecutor<Project> {
+
     @Query("select project from Project project where project.user.login = ?#{authentication.name}")
     List<Project> findByUserIsCurrentUser();
+
+    // Custom query: find projects by a specific user's login
+    @Query("select project from Project project where project.user.login = :login")
+    List<Project> findByUser_Login(@Param("login") String login);
 
     default Optional<Project> findOneWithEagerRelationships(Long id) {
         return this.findOneWithToOneRelationships(id);

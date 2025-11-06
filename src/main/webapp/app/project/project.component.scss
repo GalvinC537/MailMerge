@@ -1,0 +1,109 @@
+/* Project page scss file */
+
+$primary-blue: #0078d4;
+$hover-blue: #d0e7ff;
+$danger-red: #dc3545;
+
+.project-container {
+  background-color: #ffffff;
+  color: #000000;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  padding-top: 3rem;
+}
+
+/* Center and style the "New Project" button */
+.new-project-btn {
+  background-color: #ffffff;
+  color: $primary-blue;
+  border: 2px solid $primary-blue;
+  font-weight: 500;
+  padding: 0.6rem 2rem;
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background-color: $primary-blue;
+    color: #ffffff;
+    border-color: $primary-blue;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.3);
+  }
+}
+
+/* Inputbox style*/
+.project-input-wrapper {
+  display: flex;
+  justify-content: center;
+}
+
+.project-input {
+  width: 300px;
+  max-width: 80%;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+  text-align: center;
+  padding: 0.5rem 1rem;
+  transition: border-color 0.2s ease-in-out;
+
+  &:focus {
+    border-color: $primary-blue;
+    box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.25);
+  }
+}
+
+/* Styling for the recent projects table */
+table {
+  margin: 0 auto;
+  width: 80%;
+  border-radius: 8px;
+  overflow: hidden;
+  background-color: #fff;
+
+  th {
+    font-weight: 600;
+    color: #000;
+    background-color: #f8f9fa;
+  }
+
+  td {
+    color: #333;
+  }
+
+  tr:hover {
+    background-color: #f6f9ff;
+  }
+}
+
+/* This is styling for the open button and the delete button */
+.btn-outline-primary {
+  background-color: #ffffff;
+  color: $primary-blue;
+  border: 2px solid $primary-blue;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background-color: $primary-blue;
+    color: #ffffff;
+    border-color: $primary-blue;
+  }
+}
+
+.btn-outline-danger {
+  background-color: #ffffff;
+  color: $danger-red;
+  border: 2px solid $danger-red;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background-color: $danger-red;
+    color: #ffffff;
+    border-color: $danger-red;
+  }
+}

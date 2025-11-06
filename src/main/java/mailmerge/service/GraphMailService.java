@@ -1,3 +1,7 @@
+// This is called by MailMergeService.java
+// This uses sprongs webclient to send HTTP POST request to the Microsoft Graph API in order to send the emails
+
+
 package mailmerge.service;
 
 import org.slf4j.Logger;

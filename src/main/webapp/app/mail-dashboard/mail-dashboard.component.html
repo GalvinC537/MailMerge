@@ -1,0 +1,112 @@
+<div class="mail-dashboard container-fluid mt-4">
+
+  <!-- This part is for the back button and the Project title which sit in the top left-->
+  <div class="back-row d-flex align-items-center mb-3 ps-3">
+    <button type="button" class="btn btn-outline-primary back-btn me-3" (click)="goBack()">⬅ Back</button>
+    <h4 class="project-title mb-0">{{ projectName || 'Untitled Project' }}</h4>
+  </div>
+  <div class="row mt-3">
+
+    <!-- This class here is for the left panel -->
+    <div class="col-md-6 left-panel">
+      <form #mergeForm="ngForm" novalidate>
+        <!-- This is for the local upload of the excel file which calls the onMergeFileChange function -->
+        <div class="mb-3">
+          <label for="mergeFile" class="form-label">Excel file (.xlsx)</label>
+          <input id="mergeFile" type="file" class="form-control" (change)="onMergeFileChange($event)" required />
+        </div>
+
+        <!-- This is for text area for the input of the email subject -->
+        <div class="mb-3">
+          <label for="mergeSubject" class="form-label">Email subject</label>
+          <input
+            id="mergeSubject"
+            name="mergeSubject"
+            class="form-control"
+            type="text"
+            [(ngModel)]="mergeSubjectTemplate"
+            required
+          />
+        </div>
+
+        <!-- This is the text area for the content of the email -->
+        <div class="mb-3">
+          <label for="mergeBody" class="form-label">Email body</label>
+          <textarea
+            id="mergeBody"
+            name="mergeBody"
+            class="form-control"
+            rows="6"
+            [(ngModel)]="mergeBodyTemplate"
+            required
+          ></textarea>
+        </div>
+
+        <!-- This is for the save and send buttons. Save calls the function saveProject and send calls the function sendProject -->
+        <div class="d-flex gap-3 mt-4">
+          <button type="button" class="btn btn-outline-primary" (click)="saveProject()" [disabled]="saving">
+            {{ saving ? ' Saving...' : ' Save' }}
+          </button>
+
+          <button type="button" class="btn btn-outline-primary" (click)="sendProject()" [disabled]="mergeSending()">
+            {{ mergeSending() ? ' Sending...' : ' Send Emails' }}
+          </button>
+        </div>
+
+        <!-- This displays the status message when saving/sending this is triggered by an event in the .ts file -->
+        <div class="mt-3">
+          <div *ngIf="saveSuccess" class="text-success fw-semibold">✅ Project saved successfully.</div>
+          <div *ngIf="sendSuccess" class="text-success fw-semibold">✅ Emails sent successfully.</div>
+          <div *ngIf="mergeErr()" class="text-danger fw-semibold">❌ Mail merge failed.</div>
+        </div>
+      </form>
+    </div>
+
+    <!-- This code below is for the right hand side -->
+    <!-- Below are the two buttons there at the moment when clicked it shows the content from that button -->
+    <div class="col-md-6 right-panel text-end">
+      <div class="d-flex justify-content-end gap-2 mb-3">
+        <button
+          type="button"
+          class="btn btn-outline-primary howto-btn"
+          [class.active]="howToVisible"
+          (click)="toggleHowTo()"
+        >
+           How to Use
+        </button>
+
+        <button
+          type="button"
+          class="btn btn-outline-primary preview-btn"
+          [class.active]="previewVisible"
+          (click)="togglePreview()"
+        >
+           Preview
+        </button>
+      </div>
+
+      <!-- This is the "hard-coded" how to use section -->
+      <div *ngIf="howToVisible" class="howto-section text-start">
+        <h4>How to use MailMerge</h4>
+        <p class="text-muted">
+          1️⃣ Upload an Excel file with a header row — it must include a column named <code>email</code>.<br /><br />
+          2️⃣ In your email body, use placeholders such as <code>{{'{{name}}'}}</code> or
+          <code>{{'{{course}}'}}</code> that match column names in your Excel file.<br /><br />
+          3️⃣ Click <strong>Preview</strong> to see how your personalized emails will look.<br /><br />
+          4️⃣ Click <strong>Send Emails</strong> to send them all at once.
+        </p>
+      </div>
+
+      <!-- This is there to preview all of the emails on the right hand side -->
+      <div *ngIf="previewVisible && previewEmails.length > 0" class="preview-section mt-3 text-start">
+        <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
+        <div class="preview-list">
+          <div *ngFor="let email of previewEmails" class="preview-item">
+            <strong>To:</strong> {{ email.to }}<br />
+            <pre>{{ email.body }}</pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>

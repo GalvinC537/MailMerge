@@ -57,6 +57,7 @@ public class CacheConfiguration {
             createCache(cm, mailmerge.domain.Email.class.getName() + ".attachments");
             createCache(cm, mailmerge.domain.Attachment.class.getName());
             createCache(cm, mailmerge.domain.Heading.class.getName());
+            createCache(cm, mailmerge.domain.Project.class.getName() + ".attachments");
             // jhipster-needle-ehcache-add-entry
         };
     }

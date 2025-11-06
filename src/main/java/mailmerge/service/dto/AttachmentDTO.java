@@ -13,6 +13,8 @@ public class AttachmentDTO implements Serializable {
 
     private String content;
 
+    private ProjectDTO project;
+
     private EmailDTO email;
 
     public Long getId() {
@@ -29,6 +31,14 @@ public class AttachmentDTO implements Serializable {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public ProjectDTO getProject() {
+        return project;
+    }
+
+    public void setProject(ProjectDTO project) {
+        this.project = project;
     }
 
     public EmailDTO getEmail() {
@@ -66,6 +76,7 @@ public class AttachmentDTO implements Serializable {
         return "AttachmentDTO{" +
             "id=" + getId() +
             ", content='" + getContent() + "'" +
+            ", project=" + getProject() +
             ", email=" + getEmail() +
             "}";
     }

@@ -1,3 +1,5 @@
+// Called from project.service.ts and then calls MailMergeService.java
+
 package mailmerge.web.rest;
 
 import mailmerge.service.MailMergeService;

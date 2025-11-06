@@ -31,6 +31,7 @@
     "serverPort": null,
     "serverSideOptions": [],
     "serviceDiscoveryType": false,
+    "skipClient": true,
     "skipCommitHook": true,
     "skipUserManagement": true,
     "syncUserWithIdp": true,

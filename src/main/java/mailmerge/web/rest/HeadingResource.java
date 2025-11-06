@@ -1,7 +1,5 @@
 package mailmerge.web.rest;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -55,7 +53,7 @@ public class HeadingResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public ResponseEntity<HeadingDTO> createHeading(@Valid @RequestBody HeadingDTO headingDTO) throws URISyntaxException {
+    public ResponseEntity<HeadingDTO> createHeading(@RequestBody HeadingDTO headingDTO) throws URISyntaxException {
         LOG.debug("REST request to save Heading : {}", headingDTO);
         if (headingDTO.getId() != null) {
             throw new BadRequestAlertException("A new heading cannot already have an ID", ENTITY_NAME, "idexists");
@@ -79,7 +77,7 @@ public class HeadingResource {
     @PutMapping("/{id}")
     public ResponseEntity<HeadingDTO> updateHeading(
         @PathVariable(value = "id", required = false) final Long id,
-        @Valid @RequestBody HeadingDTO headingDTO
+        @RequestBody HeadingDTO headingDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to update Heading : {}, {}", id, headingDTO);
         if (headingDTO.getId() == null) {
@@ -113,7 +111,7 @@ public class HeadingResource {
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
     public ResponseEntity<HeadingDTO> partialUpdateHeading(
         @PathVariable(value = "id", required = false) final Long id,
-        @NotNull @RequestBody HeadingDTO headingDTO
+        @RequestBody HeadingDTO headingDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to partial update Heading partially : {}, {}", id, headingDTO);
         if (headingDTO.getId() == null) {

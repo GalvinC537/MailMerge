@@ -33,12 +33,12 @@ public class Email implements Serializable {
     private String emailAddress;
 
     @Lob
-    @Column(name = "content", nullable = false)
-    private String content;
+    @Column(name = "header", nullable = false)
+    private String header;
 
     @Lob
-    @Column(name = "variables_json")
-    private String variablesJson;
+    @Column(name = "content", nullable = false)
+    private String content;
 
     @NotNull
     @Enumerated(EnumType.STRING)
@@ -85,6 +85,19 @@ public class Email implements Serializable {
         this.emailAddress = emailAddress;
     }
 
+    public String getHeader() {
+        return this.header;
+    }
+
+    public Email header(String header) {
+        this.setHeader(header);
+        return this;
+    }
+
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
     public String getContent() {
         return this.content;
     }
@@ -96,19 +109,6 @@ public class Email implements Serializable {
 
     public void setContent(String content) {
         this.content = content;
-    }
-
-    public String getVariablesJson() {
-        return this.variablesJson;
-    }
-
-    public Email variablesJson(String variablesJson) {
-        this.setVariablesJson(variablesJson);
-        return this;
-    }
-
-    public void setVariablesJson(String variablesJson) {
-        this.variablesJson = variablesJson;
     }
 
     public EmailStatus getStatus() {
@@ -206,8 +206,8 @@ public class Email implements Serializable {
         return "Email{" +
             "id=" + getId() +
             ", emailAddress='" + getEmailAddress() + "'" +
+            ", header='" + getHeader() + "'" +
             ", content='" + getContent() + "'" +
-            ", variablesJson='" + getVariablesJson() + "'" +
             ", status='" + getStatus() + "'" +
             ", sentAt='" + getSentAt() + "'" +
             "}";

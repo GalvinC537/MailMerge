@@ -11,12 +11,15 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import mailmerge.IntegrationTest;
 import mailmerge.domain.Project;
 import mailmerge.domain.User;
+import mailmerge.domain.enumeration.EmailStatus;
 import mailmerge.repository.ProjectRepository;
 import mailmerge.repository.UserRepository;
 import mailmerge.service.ProjectService;
@@ -51,6 +54,18 @@ class ProjectResourceIT {
 
     private static final String DEFAULT_SPREADSHEET_LINK = "AAAAAAAAAA";
     private static final String UPDATED_SPREADSHEET_LINK = "BBBBBBBBBB";
+
+    private static final String DEFAULT_HEADER = "AAAAAAAAAA";
+    private static final String UPDATED_HEADER = "BBBBBBBBBB";
+
+    private static final String DEFAULT_CONTENT = "AAAAAAAAAA";
+    private static final String UPDATED_CONTENT = "BBBBBBBBBB";
+
+    private static final EmailStatus DEFAULT_STATUS = EmailStatus.PENDING;
+    private static final EmailStatus UPDATED_STATUS = EmailStatus.SENT;
+
+    private static final Instant DEFAULT_SENT_AT = Instant.ofEpochMilli(0L);
+    private static final Instant UPDATED_SENT_AT = Instant.now().truncatedTo(ChronoUnit.MILLIS);
 
     private static final String ENTITY_API_URL = "/api/projects";
     private static final String ENTITY_API_URL_ID = ENTITY_API_URL + "/{id}";
@@ -93,7 +108,13 @@ class ProjectResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Project createEntity() {
-        return new Project().name(DEFAULT_NAME).spreadsheetLink(DEFAULT_SPREADSHEET_LINK);
+        return new Project()
+            .name(DEFAULT_NAME)
+            .spreadsheetLink(DEFAULT_SPREADSHEET_LINK)
+            .header(DEFAULT_HEADER)
+            .content(DEFAULT_CONTENT)
+            .status(DEFAULT_STATUS)
+            .sentAt(DEFAULT_SENT_AT);
     }
 
     /**
@@ -103,7 +124,13 @@ class ProjectResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Project createUpdatedEntity() {
-        return new Project().name(UPDATED_NAME).spreadsheetLink(UPDATED_SPREADSHEET_LINK);
+        return new Project()
+            .name(UPDATED_NAME)
+            .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .header(UPDATED_HEADER)
+            .content(UPDATED_CONTENT)
+            .status(UPDATED_STATUS)
+            .sentAt(UPDATED_SENT_AT);
     }
 
     @BeforeEach
@@ -183,23 +210,6 @@ class ProjectResourceIT {
 
     @Test
     @Transactional
-    void checkSpreadsheetLinkIsRequired() throws Exception {
-        long databaseSizeBeforeTest = getRepositoryCount();
-        // set the field null
-        project.setSpreadsheetLink(null);
-
-        // Create the Project, which fails.
-        ProjectDTO projectDTO = projectMapper.toDto(project);
-
-        restProjectMockMvc
-            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(projectDTO)))
-            .andExpect(status().isBadRequest());
-
-        assertSameRepositoryCount(databaseSizeBeforeTest);
-    }
-
-    @Test
-    @Transactional
     void getAllProjects() throws Exception {
         // Initialize the database
         insertedProject = projectRepository.saveAndFlush(project);
@@ -211,7 +221,11 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(project.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
-            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)));
+            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)))
+            .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
+            .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
+            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
+            .andExpect(jsonPath("$.[*].sentAt").value(hasItem(DEFAULT_SENT_AT.toString())));
     }
 
     @SuppressWarnings({ "unchecked" })
@@ -244,7 +258,11 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(project.getId().intValue()))
             .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
-            .andExpect(jsonPath("$.spreadsheetLink").value(DEFAULT_SPREADSHEET_LINK));
+            .andExpect(jsonPath("$.spreadsheetLink").value(DEFAULT_SPREADSHEET_LINK))
+            .andExpect(jsonPath("$.header").value(DEFAULT_HEADER.toString()))
+            .andExpect(jsonPath("$.content").value(DEFAULT_CONTENT.toString()))
+            .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
+            .andExpect(jsonPath("$.sentAt").value(DEFAULT_SENT_AT.toString()));
     }
 
     @Test
@@ -373,6 +391,66 @@ class ProjectResourceIT {
 
     @Test
     @Transactional
+    void getAllProjectsByStatusIsEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where status equals to
+        defaultProjectFiltering("status.equals=" + DEFAULT_STATUS, "status.equals=" + UPDATED_STATUS);
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsByStatusIsInShouldWork() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where status in
+        defaultProjectFiltering("status.in=" + DEFAULT_STATUS + "," + UPDATED_STATUS, "status.in=" + UPDATED_STATUS);
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsByStatusIsNullOrNotNull() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where status is not null
+        defaultProjectFiltering("status.specified=true", "status.specified=false");
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsBySentAtIsEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where sentAt equals to
+        defaultProjectFiltering("sentAt.equals=" + DEFAULT_SENT_AT, "sentAt.equals=" + UPDATED_SENT_AT);
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsBySentAtIsInShouldWork() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where sentAt in
+        defaultProjectFiltering("sentAt.in=" + DEFAULT_SENT_AT + "," + UPDATED_SENT_AT, "sentAt.in=" + UPDATED_SENT_AT);
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsBySentAtIsNullOrNotNull() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where sentAt is not null
+        defaultProjectFiltering("sentAt.specified=true", "sentAt.specified=false");
+    }
+
+    @Test
+    @Transactional
     void getAllProjectsByUserIsEqualToSomething() throws Exception {
         User user;
         if (TestUtil.findAll(em, User.class).isEmpty()) {
@@ -408,7 +486,11 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(project.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
-            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)));
+            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)))
+            .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
+            .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
+            .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
+            .andExpect(jsonPath("$.[*].sentAt").value(hasItem(DEFAULT_SENT_AT.toString())));
 
         // Check, that the count call also returns 1
         restProjectMockMvc
@@ -456,7 +538,13 @@ class ProjectResourceIT {
         Project updatedProject = projectRepository.findById(project.getId()).orElseThrow();
         // Disconnect from session so that the updates on updatedProject are not directly saved in db
         em.detach(updatedProject);
-        updatedProject.name(UPDATED_NAME).spreadsheetLink(UPDATED_SPREADSHEET_LINK);
+        updatedProject
+            .name(UPDATED_NAME)
+            .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .header(UPDATED_HEADER)
+            .content(UPDATED_CONTENT)
+            .status(UPDATED_STATUS)
+            .sentAt(UPDATED_SENT_AT);
         ProjectDTO projectDTO = projectMapper.toDto(updatedProject);
 
         restProjectMockMvc
@@ -549,6 +637,8 @@ class ProjectResourceIT {
         Project partialUpdatedProject = new Project();
         partialUpdatedProject.setId(project.getId());
 
+        partialUpdatedProject.header(UPDATED_HEADER);
+
         restProjectMockMvc
             .perform(
                 patch(ENTITY_API_URL_ID, partialUpdatedProject.getId())
@@ -576,7 +666,13 @@ class ProjectResourceIT {
         Project partialUpdatedProject = new Project();
         partialUpdatedProject.setId(project.getId());
 
-        partialUpdatedProject.name(UPDATED_NAME).spreadsheetLink(UPDATED_SPREADSHEET_LINK);
+        partialUpdatedProject
+            .name(UPDATED_NAME)
+            .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .header(UPDATED_HEADER)
+            .content(UPDATED_CONTENT)
+            .status(UPDATED_STATUS)
+            .sentAt(UPDATED_SENT_AT);
 
         restProjectMockMvc
             .perform(

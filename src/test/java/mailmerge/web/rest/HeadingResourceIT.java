@@ -143,23 +143,6 @@ class HeadingResourceIT {
 
     @Test
     @Transactional
-    void checkNameIsRequired() throws Exception {
-        long databaseSizeBeforeTest = getRepositoryCount();
-        // set the field null
-        heading.setName(null);
-
-        // Create the Heading, which fails.
-        HeadingDTO headingDTO = headingMapper.toDto(heading);
-
-        restHeadingMockMvc
-            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(headingDTO)))
-            .andExpect(status().isBadRequest());
-
-        assertSameRepositoryCount(databaseSizeBeforeTest);
-    }
-
-    @Test
-    @Transactional
     void getAllHeadings() throws Exception {
         // Initialize the database
         insertedHeading = headingRepository.saveAndFlush(heading);

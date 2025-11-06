@@ -1,4 +1,4 @@
-id;email_address;content;variables_json;status;sent_at
+id;email_address;header;content;status;sent_at
 1;expansion bestride;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T08:11:34
 2;label;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T18:06:45
 3;fooey mmm lightly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T09:47:39

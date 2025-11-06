@@ -1,8 +1,11 @@
 package mailmerge.service.dto;
 
+import jakarta.persistence.Lob;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.Objects;
+import mailmerge.domain.enumeration.EmailStatus;
 
 /**
  * A DTO for the {@link mailmerge.domain.Project} entity.
@@ -16,8 +19,17 @@ public class ProjectDTO implements Serializable {
     @Size(min = 1)
     private String name;
 
-    @NotNull
     private String spreadsheetLink;
+
+    @Lob
+    private String header;
+
+    @Lob
+    private String content;
+
+    private EmailStatus status;
+
+    private Instant sentAt;
 
     private UserDTO user;
 
@@ -43,6 +55,38 @@ public class ProjectDTO implements Serializable {
 
     public void setSpreadsheetLink(String spreadsheetLink) {
         this.spreadsheetLink = spreadsheetLink;
+    }
+
+    public String getHeader() {
+        return header;
+    }
+
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
+    public String getContent() {
+        return content;
+    }
+
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public EmailStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(EmailStatus status) {
+        this.status = status;
+    }
+
+    public Instant getSentAt() {
+        return sentAt;
+    }
+
+    public void setSentAt(Instant sentAt) {
+        this.sentAt = sentAt;
     }
 
     public UserDTO getUser() {
@@ -81,6 +125,10 @@ public class ProjectDTO implements Serializable {
             "id=" + getId() +
             ", name='" + getName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
+            ", header='" + getHeader() + "'" +
+            ", content='" + getContent() + "'" +
+            ", status='" + getStatus() + "'" +
+            ", sentAt='" + getSentAt() + "'" +
             ", user=" + getUser() +
             "}";
     }

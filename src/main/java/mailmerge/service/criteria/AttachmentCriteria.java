@@ -26,6 +26,8 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     private StringFilter content;
 
+    private LongFilter projectId;
+
     private LongFilter emailId;
 
     private Boolean distinct;
@@ -35,6 +37,7 @@ public class AttachmentCriteria implements Serializable, Criteria {
     public AttachmentCriteria(AttachmentCriteria other) {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
         this.content = other.optionalContent().map(StringFilter::copy).orElse(null);
+        this.projectId = other.optionalProjectId().map(LongFilter::copy).orElse(null);
         this.emailId = other.optionalEmailId().map(LongFilter::copy).orElse(null);
         this.distinct = other.distinct;
     }
@@ -80,6 +83,25 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     public void setContent(StringFilter content) {
         this.content = content;
+    }
+
+    public LongFilter getProjectId() {
+        return projectId;
+    }
+
+    public Optional<LongFilter> optionalProjectId() {
+        return Optional.ofNullable(projectId);
+    }
+
+    public LongFilter projectId() {
+        if (projectId == null) {
+            setProjectId(new LongFilter());
+        }
+        return projectId;
+    }
+
+    public void setProjectId(LongFilter projectId) {
+        this.projectId = projectId;
     }
 
     public LongFilter getEmailId() {
@@ -132,6 +154,7 @@ public class AttachmentCriteria implements Serializable, Criteria {
         return (
             Objects.equals(id, that.id) &&
             Objects.equals(content, that.content) &&
+            Objects.equals(projectId, that.projectId) &&
             Objects.equals(emailId, that.emailId) &&
             Objects.equals(distinct, that.distinct)
         );
@@ -139,7 +162,7 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, content, emailId, distinct);
+        return Objects.hash(id, content, projectId, emailId, distinct);
     }
 
     // prettier-ignore
@@ -148,6 +171,7 @@ public class AttachmentCriteria implements Serializable, Criteria {
         return "AttachmentCriteria{" +
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
             optionalContent().map(f -> "content=" + f + ", ").orElse("") +
+            optionalProjectId().map(f -> "projectId=" + f + ", ").orElse("") +
             optionalEmailId().map(f -> "emailId=" + f + ", ").orElse("") +
             optionalDistinct().map(f -> "distinct=" + f + ", ").orElse("") +
         "}";

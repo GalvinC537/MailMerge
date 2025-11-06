@@ -11,13 +11,14 @@
       "fieldValidateRules": ["required"]
     },
     {
-      "fieldName": "content",
+      "fieldName": "header",
       "fieldType": "TextBlob",
       "fieldValidateRules": ["required"]
     },
     {
-      "fieldName": "variablesJson",
-      "fieldType": "TextBlob"
+      "fieldName": "content",
+      "fieldType": "TextBlob",
+      "fieldValidateRules": ["required"]
     },
     {
       "fieldName": "status",

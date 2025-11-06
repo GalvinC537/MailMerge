@@ -48,8 +48,8 @@ public class EmailAsserts {
         assertThat(expected)
             .as("Verify Email relevant properties")
             .satisfies(e -> assertThat(e.getEmailAddress()).as("check emailAddress").isEqualTo(actual.getEmailAddress()))
+            .satisfies(e -> assertThat(e.getHeader()).as("check header").isEqualTo(actual.getHeader()))
             .satisfies(e -> assertThat(e.getContent()).as("check content").isEqualTo(actual.getContent()))
-            .satisfies(e -> assertThat(e.getVariablesJson()).as("check variablesJson").isEqualTo(actual.getVariablesJson()))
             .satisfies(e -> assertThat(e.getStatus()).as("check status").isEqualTo(actual.getStatus()))
             .satisfies(e -> assertThat(e.getSentAt()).as("check sentAt").isEqualTo(actual.getSentAt()));
     }

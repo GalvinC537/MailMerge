@@ -2,7 +2,6 @@ package mailmerge.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
-import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -24,12 +23,11 @@ public class Heading implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @NotNull
-    @Column(name = "name", nullable = false)
+    @Column(name = "name")
     private String name;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JsonIgnoreProperties(value = { "emails", "headings", "user" }, allowSetters = true)
+    @JsonIgnoreProperties(value = { "headings", "attachments", "user", "emails" }, allowSetters = true)
     private Project project;
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
