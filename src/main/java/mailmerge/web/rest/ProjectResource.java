@@ -82,15 +82,14 @@ public class ProjectResource {
             throw new BadRequestAlertException("A new project cannot already have an ID", ENTITY_NAME, "idexists");
         }
 
-        //Automatically link the project to the current logged-in user
+        final ProjectDTO dto = projectDTO;
+
         String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElse(null);
-        if (currentUserLogin == null) {
-            return ResponseEntity.status(401).build(); // user not authenticated
+        if (currentUserLogin != null) {
+            userRepository.findOneByLogin(currentUserLogin)
+                .ifPresent(user -> dto.setUser(new UserDTO(user)));
         }
 
-        User currentUser = userRepository.findOneByLogin(currentUserLogin)
-            .orElseThrow(() -> new BadRequestAlertException("User not found", ENTITY_NAME, "usernotfound"));
-        projectDTO.setUser(new UserDTO(currentUser));
 
         //Save the project
         projectDTO = projectService.save(projectDTO);
