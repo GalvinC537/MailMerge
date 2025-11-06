@@ -1,10 +1,12 @@
-<nav data-cy="navbar" class="navbar navbar-dark navbar-expand-md bg-dark">
+<nav data-cy="navbar" class="navbar navbar-expand-md bg-white shadow-sm">
   <div class="container-fluid">
-    <a class="navbar-brand logo" routerLink="/" (click)="collapseNavbar()">
-      <span class="logo-img"></span>
-      <span class="navbar-title">Mailmerge</span>
-      <span class="navbar-version">{{ version }}</span>
+    <!-- Logo and Title -->
+    <a class="navbar-brand logo d-flex align-items-center" routerLink="/" (click)="collapseNavbar()">
+      <span class="logo-img me-2"></span>
+      <span class="navbar-title text-primary fw-semibold">Mailmerge</span>
     </a>
+
+    <!-- Toggle feature for mobile if needed  -->
     <a
       class="navbar-toggler d-lg-none"
       href="javascript:void(0);"
@@ -15,156 +17,21 @@
       aria-label="Toggle navigation"
       (click)="toggleNavbar()"
     >
-      <fa-icon icon="bars"></fa-icon>
+      <fa-icon icon="bars" class="text-primary"></fa-icon>
     </a>
+
     <div class="navbar-collapse collapse" id="navbarResponsive" [ngbCollapse]="isNavbarCollapsed()">
-      <ul class="navbar-nav ms-auto">
+      <ul class="navbar-nav ms-auto align-items-center">
+
+        <!-- This is the code for the home button-->
         <li class="nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
-          <a class="nav-link" routerLink="/" (click)="collapseNavbar()">
-            <span>
-              <fa-icon icon="home"></fa-icon>
-              <span>Home</span>
-            </span>
+          <a class="nav-link text-primary" routerLink="/" (click)="collapseNavbar()">
+            <fa-icon icon="home" class="me-1"></fa-icon>
+            <span>Home</span>
           </a>
         </li>
-        <!-- jhipster-needle-add-element-to-menu - JHipster will add new menu items here -->
-        @if (account() !== null) {
-          <li
-            ngbDropdown
-            class="nav-item dropdown pointer"
-            display="dynamic"
-            routerLinkActive="active"
-            [routerLinkActiveOptions]="{ exact: true }"
-          >
-            <a class="nav-link dropdown-toggle" ngbDropdownToggle href="javascript:void(0);" id="entity-menu" data-cy="entity">
-              <span>
-                <fa-icon icon="th-list"></fa-icon>
-                <span>Entities</span>
-              </span>
-            </a>
-            <ul class="dropdown-menu" ngbDropdownMenu aria-labelledby="entity-menu">
-              <li>
-                <a
-                  class="dropdown-item"
-                  routerLink="/project"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: true }"
-                  (click)="collapseNavbar()"
-                >
-                  <fa-icon icon="asterisk" [fixedWidth]="true"></fa-icon>
-                  <span>Project</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  class="dropdown-item"
-                  routerLink="/email"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: true }"
-                  (click)="collapseNavbar()"
-                >
-                  <fa-icon icon="asterisk" [fixedWidth]="true"></fa-icon>
-                  <span>Email</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  class="dropdown-item"
-                  routerLink="/attachment"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: true }"
-                  (click)="collapseNavbar()"
-                >
-                  <fa-icon icon="asterisk" [fixedWidth]="true"></fa-icon>
-                  <span>Attachment</span>
-                </a>
-              </li>
-              <li>
-                <a
-                  class="dropdown-item"
-                  routerLink="/heading"
-                  routerLinkActive="active"
-                  [routerLinkActiveOptions]="{ exact: true }"
-                  (click)="collapseNavbar()"
-                >
-                  <fa-icon icon="asterisk" [fixedWidth]="true"></fa-icon>
-                  <span>Heading</span>
-                </a>
-              </li>
-              <!-- jhipster-needle-add-entity-to-menu - JHipster will add entities to the menu here -->
-            </ul>
-          </li>
-        }
-        <li
-          *jhiHasAnyAuthority="'ROLE_ADMIN'"
-          ngbDropdown
-          class="nav-item dropdown pointer"
-          display="dynamic"
-          routerLinkActive="active"
-          [routerLinkActiveOptions]="{ exact: true }"
-        >
-          <a class="nav-link dropdown-toggle" ngbDropdownToggle href="javascript:void(0);" id="admin-menu" data-cy="adminMenu">
-            <span>
-              <fa-icon icon="users-cog"></fa-icon>
-              <span>Administration</span>
-            </span>
-          </a>
-          <ul class="dropdown-menu" ngbDropdownMenu aria-labelledby="admin-menu">
-            <li>
-              <a
-                class="dropdown-item"
-                routerLink="/authority"
-                routerLinkActive="active"
-                [routerLinkActiveOptions]="{ exact: true }"
-                (click)="collapseNavbar()"
-              >
-                <fa-icon icon="asterisk" [fixedWidth]="true"></fa-icon>
-                <span>Authority</span>
-              </a>
-            </li>
-            <!-- jhipster-needle-add-element-to-admin-menu - JHipster will add entities to the admin menu here -->
-            <li>
-              <a class="dropdown-item" routerLink="/admin/metrics" routerLinkActive="active" (click)="collapseNavbar()">
-                <fa-icon icon="tachometer-alt" [fixedWidth]="true"></fa-icon>
-                <span>Metrics</span>
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" routerLink="/admin/health" routerLinkActive="active" (click)="collapseNavbar()">
-                <fa-icon icon="heart" [fixedWidth]="true"></fa-icon>
-                <span>Health</span>
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" routerLink="/admin/configuration" routerLinkActive="active" (click)="collapseNavbar()">
-                <fa-icon icon="cogs" [fixedWidth]="true"></fa-icon>
-                <span>Configuration</span>
-              </a>
-            </li>
-            <li>
-              <a class="dropdown-item" routerLink="/admin/logs" routerLinkActive="active" (click)="collapseNavbar()">
-                <fa-icon icon="tasks" [fixedWidth]="true"></fa-icon>
-                <span>Logs</span>
-              </a>
-            </li>
-            @if (openAPIEnabled) {
-              <li>
-                <a class="dropdown-item" routerLink="/admin/docs" routerLinkActive="active" (click)="collapseNavbar()">
-                  <fa-icon icon="book" [fixedWidth]="true"></fa-icon>
-                  <span>API</span>
-                </a>
-              </li>
-            }
-            @if (!inProduction) {
-              <li>
-                <a class="dropdown-item" href="./h2-console/" target="_tab" (click)="collapseNavbar()">
-                  <fa-icon icon="database" [fixedWidth]="true"></fa-icon>
-                  <span>Database</span>
-                </a>
-              </li>
-            }
-          </ul>
-        </li>
+
+        <!-- This below is for the account drop down bar - this is the Jhipster template -->
         <li
           ngbDropdown
           class="nav-item dropdown pointer"
@@ -173,16 +40,18 @@
           [routerLinkActiveOptions]="{ exact: true }"
         >
           @let accountRef = account();
-          <a class="nav-link dropdown-toggle" ngbDropdownToggle href="javascript:void(0);" id="account-menu" data-cy="accountMenu">
+          <a
+            class="nav-link dropdown-toggle text-primary d-flex align-items-center"
+            ngbDropdownToggle
+            href="javascript:void(0);"
+            id="account-menu"
+            data-cy="accountMenu"
+          >
             @if (!accountRef?.imageUrl) {
-              <span>
-                <fa-icon icon="user"></fa-icon>
-                <span>Account</span>
-              </span>
+              <fa-icon icon="user" class="me-1"></fa-icon>
+              <span>Account</span>
             } @else {
-              <span>
-                <img [src]="accountRef!.imageUrl" class="profile-image rounded-circle" alt="Avatar" />
-              </span>
+              <img [src]="accountRef!.imageUrl" class="profile-image rounded-circle me-1" alt="Avatar" />
             }
           </a>
           <ul class="dropdown-menu" ngbDropdownMenu aria-labelledby="account-menu">

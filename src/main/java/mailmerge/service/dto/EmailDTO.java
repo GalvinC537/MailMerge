@@ -19,10 +19,10 @@ public class EmailDTO implements Serializable {
     private String emailAddress;
 
     @Lob
-    private String content;
+    private String header;
 
     @Lob
-    private String variablesJson;
+    private String content;
 
     @NotNull
     private EmailStatus status;
@@ -47,20 +47,20 @@ public class EmailDTO implements Serializable {
         this.emailAddress = emailAddress;
     }
 
+    public String getHeader() {
+        return header;
+    }
+
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
     public String getContent() {
         return content;
     }
 
     public void setContent(String content) {
         this.content = content;
-    }
-
-    public String getVariablesJson() {
-        return variablesJson;
-    }
-
-    public void setVariablesJson(String variablesJson) {
-        this.variablesJson = variablesJson;
     }
 
     public EmailStatus getStatus() {
@@ -114,8 +114,8 @@ public class EmailDTO implements Serializable {
         return "EmailDTO{" +
             "id=" + getId() +
             ", emailAddress='" + getEmailAddress() + "'" +
+            ", header='" + getHeader() + "'" +
             ", content='" + getContent() + "'" +
-            ", variablesJson='" + getVariablesJson() + "'" +
             ", status='" + getStatus() + "'" +
             ", sentAt='" + getSentAt() + "'" +
             ", project=" + getProject() +

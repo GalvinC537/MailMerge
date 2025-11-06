@@ -14,9 +14,9 @@
   "name": "Attachment",
   "relationships": [
     {
-      "otherEntityName": "email",
+      "otherEntityName": "project",
       "otherEntityRelationshipName": "attachments",
-      "relationshipName": "email",
+      "relationshipName": "project",
       "relationshipSide": "right",
       "relationshipType": "many-to-one"
     }

@@ -48,7 +48,11 @@ public class ProjectAsserts {
         assertThat(expected)
             .as("Verify Project relevant properties")
             .satisfies(e -> assertThat(e.getName()).as("check name").isEqualTo(actual.getName()))
-            .satisfies(e -> assertThat(e.getSpreadsheetLink()).as("check spreadsheetLink").isEqualTo(actual.getSpreadsheetLink()));
+            .satisfies(e -> assertThat(e.getSpreadsheetLink()).as("check spreadsheetLink").isEqualTo(actual.getSpreadsheetLink()))
+            .satisfies(e -> assertThat(e.getHeader()).as("check header").isEqualTo(actual.getHeader()))
+            .satisfies(e -> assertThat(e.getContent()).as("check content").isEqualTo(actual.getContent()))
+            .satisfies(e -> assertThat(e.getStatus()).as("check status").isEqualTo(actual.getStatus()))
+            .satisfies(e -> assertThat(e.getSentAt()).as("check sentAt").isEqualTo(actual.getSentAt()));
     }
 
     /**

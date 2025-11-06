@@ -1,5 +1,9 @@
+// responsible for application logic and data handling - contains business logic of how a Project should be created, updated,sent or processed
+//It is called by ProjectResource (backend controller)
+
 package mailmerge.service;
 
+import java.util.List;
 import java.util.Optional;
 import mailmerge.domain.Project;
 import mailmerge.repository.ProjectRepository;
@@ -106,4 +110,11 @@ public class ProjectService {
         LOG.debug("Request to delete Project : {}", id);
         projectRepository.deleteById(id);
     }
+    public List<ProjectDTO> findByUserLogin(String login) {
+        return projectRepository.findByUser_Login(login)
+            .stream()
+            .map(project -> projectMapper.toDto(project))
+            .toList();
+    }
+
 }

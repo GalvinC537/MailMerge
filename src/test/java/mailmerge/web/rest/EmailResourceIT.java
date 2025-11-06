@@ -42,11 +42,11 @@ class EmailResourceIT {
     private static final String DEFAULT_EMAIL_ADDRESS = "AAAAAAAAAA";
     private static final String UPDATED_EMAIL_ADDRESS = "BBBBBBBBBB";
 
+    private static final String DEFAULT_HEADER = "AAAAAAAAAA";
+    private static final String UPDATED_HEADER = "BBBBBBBBBB";
+
     private static final String DEFAULT_CONTENT = "AAAAAAAAAA";
     private static final String UPDATED_CONTENT = "BBBBBBBBBB";
-
-    private static final String DEFAULT_VARIABLES_JSON = "AAAAAAAAAA";
-    private static final String UPDATED_VARIABLES_JSON = "BBBBBBBBBB";
 
     private static final EmailStatus DEFAULT_STATUS = EmailStatus.PENDING;
     private static final EmailStatus UPDATED_STATUS = EmailStatus.SENT;
@@ -88,8 +88,8 @@ class EmailResourceIT {
     public static Email createEntity() {
         return new Email()
             .emailAddress(DEFAULT_EMAIL_ADDRESS)
+            .header(DEFAULT_HEADER)
             .content(DEFAULT_CONTENT)
-            .variablesJson(DEFAULT_VARIABLES_JSON)
             .status(DEFAULT_STATUS)
             .sentAt(DEFAULT_SENT_AT);
     }
@@ -103,8 +103,8 @@ class EmailResourceIT {
     public static Email createUpdatedEntity() {
         return new Email()
             .emailAddress(UPDATED_EMAIL_ADDRESS)
+            .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
-            .variablesJson(UPDATED_VARIABLES_JSON)
             .status(UPDATED_STATUS)
             .sentAt(UPDATED_SENT_AT);
     }
@@ -211,8 +211,8 @@ class EmailResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(email.getId().intValue())))
             .andExpect(jsonPath("$.[*].emailAddress").value(hasItem(DEFAULT_EMAIL_ADDRESS)))
+            .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
             .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
-            .andExpect(jsonPath("$.[*].variablesJson").value(hasItem(DEFAULT_VARIABLES_JSON.toString())))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
             .andExpect(jsonPath("$.[*].sentAt").value(hasItem(DEFAULT_SENT_AT.toString())));
     }
@@ -230,8 +230,8 @@ class EmailResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(email.getId().intValue()))
             .andExpect(jsonPath("$.emailAddress").value(DEFAULT_EMAIL_ADDRESS))
+            .andExpect(jsonPath("$.header").value(DEFAULT_HEADER.toString()))
             .andExpect(jsonPath("$.content").value(DEFAULT_CONTENT.toString()))
-            .andExpect(jsonPath("$.variablesJson").value(DEFAULT_VARIABLES_JSON.toString()))
             .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
             .andExpect(jsonPath("$.sentAt").value(DEFAULT_SENT_AT.toString()));
     }
@@ -404,8 +404,8 @@ class EmailResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(email.getId().intValue())))
             .andExpect(jsonPath("$.[*].emailAddress").value(hasItem(DEFAULT_EMAIL_ADDRESS)))
+            .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
             .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
-            .andExpect(jsonPath("$.[*].variablesJson").value(hasItem(DEFAULT_VARIABLES_JSON.toString())))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
             .andExpect(jsonPath("$.[*].sentAt").value(hasItem(DEFAULT_SENT_AT.toString())));
 
@@ -457,8 +457,8 @@ class EmailResourceIT {
         em.detach(updatedEmail);
         updatedEmail
             .emailAddress(UPDATED_EMAIL_ADDRESS)
+            .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
-            .variablesJson(UPDATED_VARIABLES_JSON)
             .status(UPDATED_STATUS)
             .sentAt(UPDATED_SENT_AT);
         EmailDTO emailDTO = emailMapper.toDto(updatedEmail);
@@ -584,8 +584,8 @@ class EmailResourceIT {
 
         partialUpdatedEmail
             .emailAddress(UPDATED_EMAIL_ADDRESS)
+            .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
-            .variablesJson(UPDATED_VARIABLES_JSON)
             .status(UPDATED_STATUS)
             .sentAt(UPDATED_SENT_AT);
 

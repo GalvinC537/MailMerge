@@ -27,6 +27,10 @@ public class Attachment implements Serializable {
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY)
+    @JsonIgnoreProperties(value = { "headings", "attachments", "user", "emails" }, allowSetters = true)
+    private Project project;
+
+    @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "attachments", "project" }, allowSetters = true)
     private Email email;
 
@@ -56,6 +60,19 @@ public class Attachment implements Serializable {
 
     public void setContent(String content) {
         this.content = content;
+    }
+
+    public Project getProject() {
+        return this.project;
+    }
+
+    public void setProject(Project project) {
+        this.project = project;
+    }
+
+    public Attachment project(Project project) {
+        this.setProject(project);
+        return this;
     }
 
     public Email getEmail() {

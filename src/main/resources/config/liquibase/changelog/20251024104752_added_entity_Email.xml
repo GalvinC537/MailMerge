@@ -17,11 +17,11 @@
             <column name="email_address" type="varchar(255)">
                 <constraints nullable="false" />
             </column>
-            <column name="content" type="${clobType}">
+            <column name="header" type="${clobType}">
                 <constraints nullable="false" />
             </column>
-            <column name="variables_json" type="${clobType}">
-                <constraints nullable="true" />
+            <column name="content" type="${clobType}">
+                <constraints nullable="false" />
             </column>
             <column name="status" type="varchar(255)">
                 <constraints nullable="false" />
@@ -55,8 +55,8 @@
                   usePreparedStatements="true">
             <column name="id" type="numeric"/>
             <column name="email_address" type="string"/>
+            <column name="header" type="clob"/>
             <column name="content" type="clob"/>
-            <column name="variables_json" type="clob"/>
             <column name="status" type="string"/>
             <column name="sent_at" type="date"/>
             <!-- jhipster-needle-liquibase-add-loadcolumn - JHipster (and/or extensions) can add load columns here -->

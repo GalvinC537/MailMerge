@@ -83,19 +83,32 @@ public class ProjectQueryService extends QueryService<Project> {
             if (criteria.getSpreadsheetLink() != null) {
                 specification = specification.and(buildStringSpecification(criteria.getSpreadsheetLink(), Project_.spreadsheetLink));
             }
-            if (criteria.getEmailsId() != null) {
-                specification = specification.and(
-                    buildSpecification(criteria.getEmailsId(), root -> root.join(Project_.emails, JoinType.LEFT).get(Email_.id))
-                );
+            if (criteria.getStatus() != null) {
+                specification = specification.and(buildSpecification(criteria.getStatus(), Project_.status));
+            }
+            if (criteria.getSentAt() != null) {
+                specification = specification.and(buildRangeSpecification(criteria.getSentAt(), Project_.sentAt));
             }
             if (criteria.getHeadingsId() != null) {
                 specification = specification.and(
                     buildSpecification(criteria.getHeadingsId(), root -> root.join(Project_.headings, JoinType.LEFT).get(Heading_.id))
                 );
             }
+            if (criteria.getAttachmentsId() != null) {
+                specification = specification.and(
+                    buildSpecification(criteria.getAttachmentsId(), root ->
+                        root.join(Project_.attachments, JoinType.LEFT).get(Attachment_.id)
+                    )
+                );
+            }
             if (criteria.getUserId() != null) {
                 specification = specification.and(
                     buildSpecification(criteria.getUserId(), root -> root.join(Project_.user, JoinType.LEFT).get(User_.id))
+                );
+            }
+            if (criteria.getEmailsId() != null) {
+                specification = specification.and(
+                    buildSpecification(criteria.getEmailsId(), root -> root.join(Project_.emails, JoinType.LEFT).get(Email_.id))
                 );
             }
         }

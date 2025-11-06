@@ -1,6 +1,5 @@
 package mailmerge.service.dto;
 
-import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -12,7 +11,6 @@ public class HeadingDTO implements Serializable {
 
     private Long id;
 
-    @NotNull
     private String name;
 
     private ProjectDTO project;

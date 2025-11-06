@@ -1,31 +1,57 @@
 @import 'bootstrap/scss/functions';
 @import 'bootstrap/scss/variables';
 
-/* ==========================================================================
-Navbar
-========================================================================== */
+/* scss for the nav bar to include the home button and the account button*/
 
-.navbar-version {
-  font-size: 0.65em;
-  color: $navbar-dark-color;
-}
-
-.profile-image {
-  height: 1.75em;
-  width: 1.75em;
-}
+$primary-blue: #0078d4;
+$hover-blue: #d0e7ff;
 
 .navbar {
-  padding: 0.2rem 1rem;
+  background-color: #ffffff !important;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid #e5e5e5;
+}
 
-  a.nav-link {
-    font-weight: 400;
+.navbar-brand {
+  .navbar-title {
+    font-size: 1.25rem;
+    font-weight: 600;
   }
 }
 
-/* ==========================================================================
-Logo styles
-========================================================================== */
+.nav-link {
+  color: $primary-blue !important;
+  font-weight: 500;
+  transition: all 0.2s ease-in-out;
+  border-radius: 6px;
+  padding: 0.5rem 0.75rem;
+
+  &:hover {
+    background-color: $hover-blue;
+    color: $primary-blue !important;
+  }
+
+  &.active {
+    background-color: $hover-blue;
+    font-weight: 600;
+  }
+}
+
+.dropdown-menu {
+  border-radius: 8px;
+  border: 1px solid #e5e5e5;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.dropdown-item {
+  color: #000;
+  &:hover {
+    background-color: $hover-blue;
+    color: $primary-blue;
+  }
+}
+
+/* This is for the logo */
 .logo-img {
   height: 45px;
   width: 45px;
@@ -33,4 +59,17 @@ Logo styles
   vertical-align: middle;
   background: url('/content/images/logo-jhipster.png') no-repeat center center;
   background-size: contain;
+}
+
+.profile-image {
+  height: 1.75em;
+  width: 1.75em;
+}
+
+/* ==========================================================================
+  Navbar version text (if used)
+  ========================================================================== */
+.navbar-version {
+  font-size: 0.65em;
+  color: #5e5e5e;
 }

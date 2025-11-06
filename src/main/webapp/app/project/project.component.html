@@ -1,0 +1,51 @@
+<div class="project-container container text-center mt-5">
+
+  <!-- New Project Section -->
+  <h2 class="mb-4">Create a New Project</h2>
+
+  <div class="new-project-section mb-5">
+    <button class="btn btn-outline-primary new-project-btn mb-3" (click)="createProject()">+ New Project</button>
+
+    <div class="project-input-wrapper mt-3">
+      <input
+        type="text"
+        class="form-control project-input mx-auto"
+        placeholder="Enter project name"
+        [(ngModel)]="newProjectName"
+      />
+    </div>
+  </div>
+
+  <!-- Recent Projects Section -->
+  <div class="recent-projects mt-5">
+    <h3 class="text-black mb-4">Recent Projects</h3>
+
+    <div *ngIf="projects.length > 0; else noProjects">
+      <table class="table table-hover align-middle shadow-sm">
+        <thead class="table-light">
+        <tr>
+          <th>Name</th>
+          <th>Status</th>
+          <th>Sent At</th>
+          <th>Actions</th>
+        </tr>
+        </thead>
+        <tbody>
+        <tr *ngFor="let project of projects">
+          <td>{{ project.name }}</td>
+          <td>{{ project.status || '—' }}</td>
+          <td>{{ project.sentAt ? (project.sentAt | date:'short') : '—' }}</td>
+          <td>
+            <button class="btn btn-outline-primary btn-sm me-2" (click)="openProject(project)">Open</button>
+            <button class="btn btn-outline-danger btn-sm" (click)="deleteProject(project.id!)">Delete</button>
+          </td>
+        </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #noProjects>
+      <div class="text-muted mt-3">No projects found.</div>
+    </ng-template>
+  </div>
+</div>

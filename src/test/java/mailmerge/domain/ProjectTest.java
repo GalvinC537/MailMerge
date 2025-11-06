@@ -1,5 +1,6 @@
 package mailmerge.domain;
 
+import static mailmerge.domain.AttachmentTestSamples.*;
 import static mailmerge.domain.EmailTestSamples.*;
 import static mailmerge.domain.HeadingTestSamples.*;
 import static mailmerge.domain.ProjectTestSamples.*;
@@ -27,28 +28,6 @@ class ProjectTest {
     }
 
     @Test
-    void emailsTest() {
-        Project project = getProjectRandomSampleGenerator();
-        Email emailBack = getEmailRandomSampleGenerator();
-
-        project.addEmails(emailBack);
-        assertThat(project.getEmails()).containsOnly(emailBack);
-        assertThat(emailBack.getProject()).isEqualTo(project);
-
-        project.removeEmails(emailBack);
-        assertThat(project.getEmails()).doesNotContain(emailBack);
-        assertThat(emailBack.getProject()).isNull();
-
-        project.emails(new HashSet<>(Set.of(emailBack)));
-        assertThat(project.getEmails()).containsOnly(emailBack);
-        assertThat(emailBack.getProject()).isEqualTo(project);
-
-        project.setEmails(new HashSet<>());
-        assertThat(project.getEmails()).doesNotContain(emailBack);
-        assertThat(emailBack.getProject()).isNull();
-    }
-
-    @Test
     void headingsTest() {
         Project project = getProjectRandomSampleGenerator();
         Heading headingBack = getHeadingRandomSampleGenerator();
@@ -68,5 +47,49 @@ class ProjectTest {
         project.setHeadings(new HashSet<>());
         assertThat(project.getHeadings()).doesNotContain(headingBack);
         assertThat(headingBack.getProject()).isNull();
+    }
+
+    @Test
+    void attachmentsTest() {
+        Project project = getProjectRandomSampleGenerator();
+        Attachment attachmentBack = getAttachmentRandomSampleGenerator();
+
+        project.addAttachments(attachmentBack);
+        assertThat(project.getAttachments()).containsOnly(attachmentBack);
+        assertThat(attachmentBack.getProject()).isEqualTo(project);
+
+        project.removeAttachments(attachmentBack);
+        assertThat(project.getAttachments()).doesNotContain(attachmentBack);
+        assertThat(attachmentBack.getProject()).isNull();
+
+        project.attachments(new HashSet<>(Set.of(attachmentBack)));
+        assertThat(project.getAttachments()).containsOnly(attachmentBack);
+        assertThat(attachmentBack.getProject()).isEqualTo(project);
+
+        project.setAttachments(new HashSet<>());
+        assertThat(project.getAttachments()).doesNotContain(attachmentBack);
+        assertThat(attachmentBack.getProject()).isNull();
+    }
+
+    @Test
+    void emailsTest() {
+        Project project = getProjectRandomSampleGenerator();
+        Email emailBack = getEmailRandomSampleGenerator();
+
+        project.addEmails(emailBack);
+        assertThat(project.getEmails()).containsOnly(emailBack);
+        assertThat(emailBack.getProject()).isEqualTo(project);
+
+        project.removeEmails(emailBack);
+        assertThat(project.getEmails()).doesNotContain(emailBack);
+        assertThat(emailBack.getProject()).isNull();
+
+        project.emails(new HashSet<>(Set.of(emailBack)));
+        assertThat(project.getEmails()).containsOnly(emailBack);
+        assertThat(emailBack.getProject()).isEqualTo(project);
+
+        project.setEmails(new HashSet<>());
+        assertThat(project.getEmails()).doesNotContain(emailBack);
+        assertThat(emailBack.getProject()).isNull();
     }
 }

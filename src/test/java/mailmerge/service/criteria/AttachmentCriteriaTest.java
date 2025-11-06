@@ -76,6 +76,7 @@ class AttachmentCriteriaTest {
     private static void setAllFilters(AttachmentCriteria attachmentCriteria) {
         attachmentCriteria.id();
         attachmentCriteria.content();
+        attachmentCriteria.projectId();
         attachmentCriteria.emailId();
         attachmentCriteria.distinct();
     }
@@ -85,6 +86,7 @@ class AttachmentCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId()) &&
                 condition.apply(criteria.getContent()) &&
+                condition.apply(criteria.getProjectId()) &&
                 condition.apply(criteria.getEmailId()) &&
                 condition.apply(criteria.getDistinct()),
             "every filter matches"
@@ -96,6 +98,7 @@ class AttachmentCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId(), copy.getId()) &&
                 condition.apply(criteria.getContent(), copy.getContent()) &&
+                condition.apply(criteria.getProjectId(), copy.getProjectId()) &&
                 condition.apply(criteria.getEmailId(), copy.getEmailId()) &&
                 condition.apply(criteria.getDistinct(), copy.getDistinct()),
             "every filter matches"

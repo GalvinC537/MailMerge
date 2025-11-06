@@ -13,8 +13,24 @@
     },
     {
       "fieldName": "spreadsheetLink",
-      "fieldType": "String",
-      "fieldValidateRules": ["required"]
+      "fieldType": "String"
+    },
+    {
+      "fieldName": "header",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "content",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "status",
+      "fieldType": "EmailStatus",
+      "fieldValues": "PENDING,SENT,FAILED"
+    },
+    {
+      "fieldName": "sentAt",
+      "fieldType": "Instant"
     }
   ],
   "jpaMetamodelFiltering": true,
@@ -22,16 +38,16 @@
   "pagination": "pagination",
   "relationships": [
     {
-      "otherEntityName": "email",
+      "otherEntityName": "heading",
       "otherEntityRelationshipName": "project",
-      "relationshipName": "emails",
+      "relationshipName": "headings",
       "relationshipSide": "left",
       "relationshipType": "one-to-many"
     },
     {
-      "otherEntityName": "heading",
+      "otherEntityName": "attachment",
       "otherEntityRelationshipName": "project",
-      "relationshipName": "headings",
+      "relationshipName": "attachments",
       "relationshipSide": "left",
       "relationshipType": "one-to-many"
     },

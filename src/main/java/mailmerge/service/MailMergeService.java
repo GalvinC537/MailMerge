@@ -1,3 +1,6 @@
+// This file is called by MailMergeResource.java
+// This file parses the excel sheet, replaces the placeholders with values and then sends emails using API
+// Parses the files to GraphMailService.java
 package mailmerge.service;
 
 import java.io.IOException;

@@ -10,6 +10,13 @@
     -->
     <changeSet id="20251024104753-2" author="jhipster">
 
+        <addForeignKeyConstraint baseColumnNames="project_id"
+                                 baseTableName="attachment"
+                                 constraintName="fk_attachment__project_id"
+                                 referencedColumnNames="id"
+                                 referencedTableName="project"
+                                 />
+
         <addForeignKeyConstraint baseColumnNames="email_id"
                                  baseTableName="attachment"
                                  constraintName="fk_attachment__email_id"

@@ -1,3 +1,7 @@
+// This is the backend controller. Its purpose is to define the REST endpoints
+// project.service.ts makes HTTP requests to REST endpoints so has to call one of these functions to do so
+
+
 package mailmerge.web.rest;
 
 import jakarta.validation.Valid;
@@ -25,6 +29,11 @@ import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
 import tech.jhipster.web.util.ResponseUtil;
+import mailmerge.repository.UserRepository;
+import mailmerge.domain.User;
+import mailmerge.security.SecurityUtils;
+import mailmerge.service.dto.UserDTO;
+
 
 /**
  * REST controller for managing {@link mailmerge.domain.Project}.
@@ -46,10 +55,13 @@ public class ProjectResource {
 
     private final ProjectQueryService projectQueryService;
 
-    public ProjectResource(ProjectService projectService, ProjectRepository projectRepository, ProjectQueryService projectQueryService) {
+    private final UserRepository userRepository;
+
+    public ProjectResource(ProjectService projectService, ProjectRepository projectRepository, ProjectQueryService projectQueryService, UserRepository userRepository) {
         this.projectService = projectService;
         this.projectRepository = projectRepository;
         this.projectQueryService = projectQueryService;
+        this.userRepository = userRepository;
     }
 
     /**
@@ -59,13 +71,29 @@ public class ProjectResource {
      * @return the {@link ResponseEntity} with status {@code 201 (Created)} and with body the new projectDTO, or with status {@code 400 (Bad Request)} if the project has already an ID.
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
+    /**
+     * {@code POST  /projects} : Create a new project and automatically link it to the logged-in user.
+     */
     @PostMapping("")
     public ResponseEntity<ProjectDTO> createProject(@Valid @RequestBody ProjectDTO projectDTO) throws URISyntaxException {
         LOG.debug("REST request to save Project : {}", projectDTO);
+
         if (projectDTO.getId() != null) {
             throw new BadRequestAlertException("A new project cannot already have an ID", ENTITY_NAME, "idexists");
         }
+
+        final ProjectDTO dto = projectDTO;
+
+        String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElse(null);
+        if (currentUserLogin != null) {
+            userRepository.findOneByLogin(currentUserLogin)
+                .ifPresent(user -> dto.setUser(new UserDTO(user)));
+        }
+
+
+        //Save the project
         projectDTO = projectService.save(projectDTO);
+
         return ResponseEntity.created(new URI("/api/projects/" + projectDTO.getId()))
             .headers(HeaderUtil.createEntityCreationAlert(applicationName, false, ENTITY_NAME, projectDTO.getId().toString()))
             .body(projectDTO);
@@ -141,6 +169,39 @@ public class ProjectResource {
     }
 
     /**
+     * {@code PATCH  /projects/:id/status} : Updates only the status (and optional sentAt timestamp) of a project.
+     *
+     * @param id the id of the project to update.
+     * @param status the new status (PENDING, SENT, FAILED)
+     * @param sentAt optional ISO timestamp for when it was sent
+     * @return the updated ProjectDTO
+     */
+    @PatchMapping("/{id}/status")
+    public ResponseEntity<ProjectDTO> updateProjectStatus(
+        @PathVariable Long id,
+        @RequestParam("status") String status,
+        @RequestParam(value = "sentAt", required = false) String sentAt
+    ) {
+        LOG.debug("REST request to update project {} to status {}", id, status);
+
+        ProjectDTO project = projectService.findOne(id)
+            .orElseThrow(() -> new BadRequestAlertException("Project not found", ENTITY_NAME, "idnotfound"));
+
+
+        // Update status safely
+        project.setStatus(Enum.valueOf(mailmerge.domain.enumeration.EmailStatus.class, status.toUpperCase()));
+
+        // If SENT, add timestamp
+        if ("SENT".equalsIgnoreCase(status) && sentAt != null) {
+            project.setSentAt(java.time.Instant.parse(sentAt));
+        }
+
+        ProjectDTO result = projectService.update(project);
+        return ResponseEntity.ok(result);
+    }
+
+
+    /**
      * {@code GET  /projects} : get all the projects.
      *
      * @param pageable the pagination information.
@@ -198,4 +259,22 @@ public class ProjectResource {
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
             .build();
     }
+
+    @GetMapping("/my")
+    public ResponseEntity<List<ProjectDTO>> getMyProjects() {
+        LOG.debug("REST request to get projects for current user");
+
+        // Get the username of the currently logged-in user
+        String username = mailmerge.security.SecurityUtils.getCurrentUserLogin().orElse(null);
+        if (username == null) {
+            return ResponseEntity.status(401).build(); // Not logged in
+        }
+
+        // Use the ProjectService to fetch projects for that user
+        List<ProjectDTO> projects = projectService.findByUserLogin(username);
+
+        return ResponseEntity.ok(projects);
+    }
+
+
 }

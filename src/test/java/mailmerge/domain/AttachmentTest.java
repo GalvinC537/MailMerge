@@ -2,6 +2,7 @@ package mailmerge.domain;
 
 import static mailmerge.domain.AttachmentTestSamples.*;
 import static mailmerge.domain.EmailTestSamples.*;
+import static mailmerge.domain.ProjectTestSamples.*;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import mailmerge.web.rest.TestUtil;
@@ -21,6 +22,18 @@ class AttachmentTest {
 
         attachment2 = getAttachmentSample2();
         assertThat(attachment1).isNotEqualTo(attachment2);
+    }
+
+    @Test
+    void projectTest() {
+        Attachment attachment = getAttachmentRandomSampleGenerator();
+        Project projectBack = getProjectRandomSampleGenerator();
+
+        attachment.setProject(projectBack);
+        assertThat(attachment.getProject()).isEqualTo(projectBack);
+
+        attachment.project(null);
+        assertThat(attachment.getProject()).isNull();
     }
 
     @Test

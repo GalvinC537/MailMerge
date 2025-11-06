@@ -4,8 +4,10 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.*;
 import java.io.Serializable;
+import java.time.Instant;
 import java.util.HashSet;
 import java.util.Set;
+import mailmerge.domain.enumeration.EmailStatus;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
 
@@ -31,22 +33,41 @@ public class Project implements Serializable {
     @Column(name = "name", nullable = false)
     private String name;
 
-    @NotNull
-    @Column(name = "spreadsheet_link", nullable = false)
+    @Column(name = "spreadsheet_link")
     private String spreadsheetLink;
 
-    @OneToMany(fetch = FetchType.LAZY, mappedBy = "project")
-    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
-    @JsonIgnoreProperties(value = { "attachments", "project" }, allowSetters = true)
-    private Set<Email> emails = new HashSet<>();
+    @Lob
+    @Column(name = "header")
+    private String header;
+
+    @Lob
+    @Column(name = "content")
+    private String content;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private EmailStatus status;
+
+    @Column(name = "sent_at")
+    private Instant sentAt;
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "project")
     @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
     @JsonIgnoreProperties(value = { "project" }, allowSetters = true)
     private Set<Heading> headings = new HashSet<>();
 
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "project")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    @JsonIgnoreProperties(value = { "project", "email" }, allowSetters = true)
+    private Set<Attachment> attachments = new HashSet<>();
+
     @ManyToOne(fetch = FetchType.LAZY)
     private User user;
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "project")
+    @Cache(usage = CacheConcurrencyStrategy.READ_WRITE)
+    @JsonIgnoreProperties(value = { "attachments", "project" }, allowSetters = true)
+    private Set<Email> emails = new HashSet<>();
 
     // jhipster-needle-entity-add-field - JHipster will add fields here
 
@@ -89,35 +110,56 @@ public class Project implements Serializable {
         this.spreadsheetLink = spreadsheetLink;
     }
 
-    public Set<Email> getEmails() {
-        return this.emails;
+    public String getHeader() {
+        return this.header;
     }
 
-    public void setEmails(Set<Email> emails) {
-        if (this.emails != null) {
-            this.emails.forEach(i -> i.setProject(null));
-        }
-        if (emails != null) {
-            emails.forEach(i -> i.setProject(this));
-        }
-        this.emails = emails;
-    }
-
-    public Project emails(Set<Email> emails) {
-        this.setEmails(emails);
+    public Project header(String header) {
+        this.setHeader(header);
         return this;
     }
 
-    public Project addEmails(Email email) {
-        this.emails.add(email);
-        email.setProject(this);
+    public void setHeader(String header) {
+        this.header = header;
+    }
+
+    public String getContent() {
+        return this.content;
+    }
+
+    public Project content(String content) {
+        this.setContent(content);
         return this;
     }
 
-    public Project removeEmails(Email email) {
-        this.emails.remove(email);
-        email.setProject(null);
+    public void setContent(String content) {
+        this.content = content;
+    }
+
+    public EmailStatus getStatus() {
+        return this.status;
+    }
+
+    public Project status(EmailStatus status) {
+        this.setStatus(status);
         return this;
+    }
+
+    public void setStatus(EmailStatus status) {
+        this.status = status;
+    }
+
+    public Instant getSentAt() {
+        return this.sentAt;
+    }
+
+    public Project sentAt(Instant sentAt) {
+        this.setSentAt(sentAt);
+        return this;
+    }
+
+    public void setSentAt(Instant sentAt) {
+        this.sentAt = sentAt;
     }
 
     public Set<Heading> getHeadings() {
@@ -151,6 +193,37 @@ public class Project implements Serializable {
         return this;
     }
 
+    public Set<Attachment> getAttachments() {
+        return this.attachments;
+    }
+
+    public void setAttachments(Set<Attachment> attachments) {
+        if (this.attachments != null) {
+            this.attachments.forEach(i -> i.setProject(null));
+        }
+        if (attachments != null) {
+            attachments.forEach(i -> i.setProject(this));
+        }
+        this.attachments = attachments;
+    }
+
+    public Project attachments(Set<Attachment> attachments) {
+        this.setAttachments(attachments);
+        return this;
+    }
+
+    public Project addAttachments(Attachment attachment) {
+        this.attachments.add(attachment);
+        attachment.setProject(this);
+        return this;
+    }
+
+    public Project removeAttachments(Attachment attachment) {
+        this.attachments.remove(attachment);
+        attachment.setProject(null);
+        return this;
+    }
+
     public User getUser() {
         return this.user;
     }
@@ -161,6 +234,37 @@ public class Project implements Serializable {
 
     public Project user(User user) {
         this.setUser(user);
+        return this;
+    }
+
+    public Set<Email> getEmails() {
+        return this.emails;
+    }
+
+    public void setEmails(Set<Email> emails) {
+        if (this.emails != null) {
+            this.emails.forEach(i -> i.setProject(null));
+        }
+        if (emails != null) {
+            emails.forEach(i -> i.setProject(this));
+        }
+        this.emails = emails;
+    }
+
+    public Project emails(Set<Email> emails) {
+        this.setEmails(emails);
+        return this;
+    }
+
+    public Project addEmails(Email email) {
+        this.emails.add(email);
+        email.setProject(this);
+        return this;
+    }
+
+    public Project removeEmails(Email email) {
+        this.emails.remove(email);
+        email.setProject(null);
         return this;
     }
 
@@ -190,6 +294,10 @@ public class Project implements Serializable {
             "id=" + getId() +
             ", name='" + getName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
+            ", header='" + getHeader() + "'" +
+            ", content='" + getContent() + "'" +
+            ", status='" + getStatus() + "'" +
+            ", sentAt='" + getSentAt() + "'" +
             "}";
     }
 }

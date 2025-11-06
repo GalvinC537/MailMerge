@@ -15,6 +15,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import mailmerge.IntegrationTest;
 import mailmerge.domain.Attachment;
 import mailmerge.domain.Email;
+import mailmerge.domain.Project;
 import mailmerge.repository.AttachmentRepository;
 import mailmerge.service.dto.AttachmentDTO;
 import mailmerge.service.mapper.AttachmentMapper;
@@ -234,6 +235,28 @@ class AttachmentResourceIT {
 
         // Get all the attachmentList where content does not contain
         defaultAttachmentFiltering("content.doesNotContain=" + UPDATED_CONTENT, "content.doesNotContain=" + DEFAULT_CONTENT);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByProjectIsEqualToSomething() throws Exception {
+        Project project;
+        if (TestUtil.findAll(em, Project.class).isEmpty()) {
+            attachmentRepository.saveAndFlush(attachment);
+            project = ProjectResourceIT.createEntity();
+        } else {
+            project = TestUtil.findAll(em, Project.class).get(0);
+        }
+        em.persist(project);
+        em.flush();
+        attachment.setProject(project);
+        attachmentRepository.saveAndFlush(attachment);
+        Long projectId = project.getId();
+        // Get all the attachmentList where project equals to projectId
+        defaultAttachmentShouldBeFound("projectId.equals=" + projectId);
+
+        // Get all the attachmentList where project equals to (projectId + 1)
+        defaultAttachmentShouldNotBeFound("projectId.equals=" + (projectId + 1));
     }
 
     @Test

@@ -1,21 +1,52 @@
-/* ==========================================================================
-Main page styles
-========================================================================== */
+/* This is the scss for home, this is the sign in page*/
 
-.hipster {
-  display: inline-block;
-  width: 347px;
-  height: 497px;
-  background: url('../../content/images/jhipster_family_member_3.svg') no-repeat center top;
-  background-size: contain;
+$primary-blue: #0078d4;
+$hover-blue: #d0e7ff;
+
+.home-container {
+  background-color: #ffffff;
+  color: #000000;
+  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+  padding-top: 4rem;
+
+  h1 {
+    font-weight: 600;
+    color: #000;
+  }
+
+  .lead {
+    color: #5e5e5e;
+  }
 }
 
-/* wait autoprefixer update to allow simple generation of high pixel density media query */
+/* For the sign in button */
+.sign-in-btn {
+  background-color: #ffffff;
+  color: $primary-blue;
+  border: 2px solid $primary-blue;
+  font-weight: 500;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    background-color: $primary-blue;
+    color: #ffffff;
+    border-color: $primary-blue;
+  }
+
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.3);
+  }
+}
+
+/* High DPI screens - from Jhipster template */
 @media only screen and (-webkit-min-device-pixel-ratio: 2),
-  only screen and (-moz-min-device-pixel-ratio: 2),
-  only screen and (-o-min-device-pixel-ratio: 2/1),
-  only screen and (min-resolution: 192dpi),
-  only screen and (min-resolution: 2dppx) {
+only screen and (-moz-min-device-pixel-ratio: 2),
+only screen and (-o-min-device-pixel-ratio: 2/1),
+only screen and (min-resolution: 192dpi),
+only screen and (min-resolution: 2dppx) {
   .hipster {
     background: url('../../content/images/jhipster_family_member_3.svg') no-repeat center top;
     background-size: contain;
