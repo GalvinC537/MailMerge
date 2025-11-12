@@ -247,11 +247,22 @@ class ProjectResourceIT {
 
     @Test
     @Transactional
+    @WithMockUser(username = "user") // ensures a logged-in user for test
     void getProject() throws Exception {
-        // Initialize the database
+        // Ensure the test user exists in the database
+        User currentUser = userRepository.findOneByLogin("user").orElseGet(() -> {
+            User newUser = new User();
+            newUser.setId(String.valueOf(1L)); // ✅ manually set ID
+            newUser.setLogin("user");
+            newUser.setActivated(true);
+            return userRepository.saveAndFlush(newUser);
+        });
+
+        // Assign project to the logged-in user
+        project.setUser(currentUser);
         insertedProject = projectRepository.saveAndFlush(project);
 
-        // Get the project
+        // Get the project (should succeed with 200 OK)
         restProjectMockMvc
             .perform(get(ENTITY_API_URL_ID, project.getId()))
             .andExpect(status().isOk())
