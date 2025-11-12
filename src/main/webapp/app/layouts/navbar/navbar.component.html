@@ -47,12 +47,8 @@
             id="account-menu"
             data-cy="accountMenu"
           >
-            @if (!accountRef?.imageUrl) {
-              <fa-icon icon="user" class="me-1"></fa-icon>
-              <span>Account</span>
-            } @else {
-              <img [src]="accountRef!.imageUrl" class="profile-image rounded-circle me-1" alt="Avatar" />
-            }
+            <fa-icon icon="user-circle" class="me-1"></fa-icon>
+            <span>{{ accountRef?.login || 'Account' }}</span>
           </a>
           <ul class="dropdown-menu" ngbDropdownMenu aria-labelledby="account-menu">
             @if (accountRef !== null) {
