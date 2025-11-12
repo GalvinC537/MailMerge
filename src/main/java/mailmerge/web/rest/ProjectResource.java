@@ -23,8 +23,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
@@ -242,27 +244,15 @@ public class ProjectResource {
     public ResponseEntity<ProjectDTO> getProject(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Project : {}", id);
 
-        // Get the current user
-        String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElse(null);
-        if (currentUserLogin == null) {
-            return ResponseEntity.status(401).build(); // Not logged in
-        }
+        String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElseThrow();
 
-        // Fetch the project
-        Optional<ProjectDTO> projectDTOOpt = projectService.findOne(id);
+        ProjectDTO projectDTO = projectService.findOne(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
 
-        if (projectDTOOpt.isEmpty()) {
-            return ResponseEntity.notFound().build(); // Project doesn't exist
-        }
-
-        ProjectDTO projectDTO = projectDTOOpt.get();
-
-        // Check if the project belongs to the logged-in user
         if (projectDTO.getUser() == null || !currentUserLogin.equals(projectDTO.getUser().getLogin())) {
-            return ResponseEntity.status(403).build(); // Forbidden
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
         }
 
-        // If everything is fine, return it
         return ResponseEntity.ok(projectDTO);
     }
 
