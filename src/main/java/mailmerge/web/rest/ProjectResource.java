@@ -241,8 +241,29 @@ public class ProjectResource {
     @GetMapping("/{id}")
     public ResponseEntity<ProjectDTO> getProject(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Project : {}", id);
-        Optional<ProjectDTO> projectDTO = projectService.findOne(id);
-        return ResponseUtil.wrapOrNotFound(projectDTO);
+
+        // Get the current user
+        String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElse(null);
+        if (currentUserLogin == null) {
+            return ResponseEntity.status(401).build(); // Not logged in
+        }
+
+        // Fetch the project
+        Optional<ProjectDTO> projectDTOOpt = projectService.findOne(id);
+
+        if (projectDTOOpt.isEmpty()) {
+            return ResponseEntity.notFound().build(); // Project doesn't exist
+        }
+
+        ProjectDTO projectDTO = projectDTOOpt.get();
+
+        // Check if the project belongs to the logged-in user
+        if (projectDTO.getUser() == null || !currentUserLogin.equals(projectDTO.getUser().getLogin())) {
+            return ResponseEntity.status(403).build(); // Forbidden
+        }
+
+        // If everything is fine, return it
+        return ResponseEntity.ok(projectDTO);
     }
 
     /**
