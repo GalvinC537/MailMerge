@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, AfterViewInit, inject, signal } from '@angular/core';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx'; // imported to handle excel file parsing for mailmerge input
@@ -37,8 +37,9 @@ export class MailDashboardComponent implements OnInit {
   sendSuccess = false;
 
   previewEmails: { to: string; body: string }[] = [];
-  previewVisible = false;
+  previewVisible = true;
   howToVisible = false;
+  spreadsheetHeaders: string[] = []; // This is for the headers used for the drag and drop feature
 
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
@@ -60,6 +61,11 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
+  //This runs once the view has rendered — show initial preview automatically
+  ngAfterViewInit(): void {
+    setTimeout(() => this.previewMerge(), 500); // delay ensures template is ready
+  }
+
   // This function is the back button which allows the user to go back to the project page
   goBack(): void {
     void this.router.navigate(['/project']);
@@ -72,6 +78,66 @@ export class MailDashboardComponent implements OnInit {
   onMergeFileChange(event: Event): void {
     const input = event.target as HTMLInputElement | null;
     this.mergeFile = input?.files && input.files.length > 0 ? input.files[0] : null;
+
+    if (!this.mergeFile) return;
+
+    const reader = new FileReader();
+    reader.onload = e => {
+      const result = (e.target as FileReader).result;
+      if (!result) return;
+
+      const data = new Uint8Array(result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.SheetNames[0];
+      const sheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheet], { header: 1 });
+
+      // First row contains headers
+      if (Array.isArray(sheetData) && sheetData.length > 0) {
+        this.spreadsheetHeaders = (sheetData[0] as unknown as string[]).filter(h => !!h && h.trim() !== '');
+      }
+
+      this.previewMerge();
+    };
+    reader.readAsArrayBuffer(this.mergeFile);
+  }
+
+  // Below is used for drag and drop functionality
+  onDragStart(event: DragEvent, header: string): void {
+    event.dataTransfer?.setData('text/plain', `{{${header}}}`);
+  }
+
+  allowDrop(event: DragEvent): void {
+    event.preventDefault();
+  }
+
+  onDrop(event: DragEvent, field: 'subject' | 'body'): void {
+    event.preventDefault();
+    const text = event.dataTransfer?.getData('text/plain') ?? '';
+
+    if (field === 'subject') {
+      const input = document.getElementById('mergeSubject') as HTMLInputElement;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (input) {
+        const start = input.selectionStart ?? 0;
+        const end = input.selectionEnd ?? 0;
+        const value = input.value;
+        input.value = value.slice(0, start) + text + value.slice(end);
+        this.mergeSubjectTemplate = input.value;
+        this.previewMerge();
+      }
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    } else if (field === 'body') {
+      const textarea = document.getElementById('mergeBody') as HTMLTextAreaElement;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (textarea) {
+        const start = textarea.selectionStart || 0;
+        const end = textarea.selectionEnd || 0;
+        const value = textarea.value;
+        textarea.value = value.slice(0, start) + text + value.slice(end);
+        this.mergeBodyTemplate = textarea.value;
+        this.previewMerge();
+      }
+    }
   }
 
   // This function loads the project from the backend and fills in the fields based on this data
@@ -84,6 +150,7 @@ export class MailDashboardComponent implements OnInit {
         this.projectName = p.name ?? '';
         this.mergeSubjectTemplate = p.header ?? '';
         this.mergeBodyTemplate = p.content ?? '';
+        this.previewMerge();
       },
       error: err => console.error('❌ Failed to load project', err),
     });
@@ -110,6 +177,7 @@ export class MailDashboardComponent implements OnInit {
         this.saving = false;
         this.saveSuccess = true;
         setTimeout(() => (this.saveSuccess = false), 3000);
+        this.previewMerge();
       },
       error: err => {
         console.error('❌ Failed to save project', err);

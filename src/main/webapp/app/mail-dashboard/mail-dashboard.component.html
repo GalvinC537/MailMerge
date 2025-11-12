@@ -16,6 +16,21 @@
           <input id="mergeFile" type="file" class="form-control" (change)="onMergeFileChange($event)" required />
         </div>
 
+        <div *ngIf="spreadsheetHeaders?.length" class="mt-3">
+          <label class="form-label">Available Merge Fields:</label>
+          <div class="d-flex flex-wrap gap-2">
+        <span
+        *ngFor="let header of spreadsheetHeaders"
+        class="badge bg-info text-dark p-2"
+        draggable="true"
+        (dragstart)="onDragStart($event, header)"
+        >
+        {{ header }}
+        </span>
+          </div>
+          <small class="text-muted">Drag and drop these into Subject or Body fields below</small>
+        </div>
+
         <!-- This is for text area for the input of the email subject -->
         <div class="mb-3">
           <label for="mergeSubject" class="form-label">Email subject</label>
@@ -38,7 +53,10 @@
             class="form-control"
             rows="6"
             [(ngModel)]="mergeBodyTemplate"
+            (ngModelChange)="previewMerge()"
             required
+            (drop)="onDrop($event, 'body')"
+            (dragover)="allowDrop($event)"
           ></textarea>
         </div>
 

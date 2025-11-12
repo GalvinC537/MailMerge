@@ -23,8 +23,10 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 import tech.jhipster.web.util.HeaderUtil;
 import tech.jhipster.web.util.PaginationUtil;
@@ -241,8 +243,17 @@ public class ProjectResource {
     @GetMapping("/{id}")
     public ResponseEntity<ProjectDTO> getProject(@PathVariable("id") Long id) {
         LOG.debug("REST request to get Project : {}", id);
-        Optional<ProjectDTO> projectDTO = projectService.findOne(id);
-        return ResponseUtil.wrapOrNotFound(projectDTO);
+
+        String currentUserLogin = SecurityUtils.getCurrentUserLogin().orElseThrow();
+
+        ProjectDTO projectDTO = projectService.findOne(id)
+            .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Project not found"));
+
+        if (projectDTO.getUser() == null || !currentUserLogin.equals(projectDTO.getUser().getLogin())) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+
+        return ResponseEntity.ok(projectDTO);
     }
 
     /**
