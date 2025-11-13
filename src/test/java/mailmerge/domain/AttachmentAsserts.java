@@ -47,7 +47,11 @@ public class AttachmentAsserts {
     public static void assertAttachmentUpdatableFieldsEquals(Attachment expected, Attachment actual) {
         assertThat(expected)
             .as("Verify Attachment relevant properties")
-            .satisfies(e -> assertThat(e.getContent()).as("check content").isEqualTo(actual.getContent()));
+            .satisfies(e -> assertThat(e.getFile()).as("check file").isEqualTo(actual.getFile()))
+            .satisfies(e -> assertThat(e.getFileContentType()).as("check file contenty type").isEqualTo(actual.getFileContentType()))
+            .satisfies(e -> assertThat(e.getFileContentType()).as("check fileContentType").isEqualTo(actual.getFileContentType()))
+            .satisfies(e -> assertThat(e.getName()).as("check name").isEqualTo(actual.getName()))
+            .satisfies(e -> assertThat(e.getSize()).as("check size").isEqualTo(actual.getSize()));
     }
 
     /**

@@ -21,10 +21,16 @@ public class GraphMailResource {
     @PostMapping("/send")
     public ResponseEntity<Void> sendMail(@RequestBody GraphMailDTO mailRequest) {
         log.debug("REST request to send email via Graph API: {}", mailRequest);
-        graphMailService.sendMail(mailRequest.getTo(), mailRequest.getSubject(), mailRequest.getBody());
+
+        graphMailService.sendMail(
+            mailRequest.getTo(),
+            mailRequest.getCc(),
+            mailRequest.getBcc(),
+            mailRequest.getSubject(),
+            mailRequest.getBody(),
+            mailRequest.getAttachments()
+        );
+
         return ResponseEntity.ok().build();
     }
 }
-
-
-

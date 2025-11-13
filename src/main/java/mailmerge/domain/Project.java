@@ -33,8 +33,27 @@ public class Project implements Serializable {
     @Column(name = "name", nullable = false)
     private String name;
 
+    @Lob
     @Column(name = "spreadsheet_link")
-    private String spreadsheetLink;
+    private byte[] spreadsheetLink;
+
+    @Column(name = "spreadsheet_link_content_type")
+    private String spreadsheetLinkContentType;
+
+    @Column(name = "spreadsheet_file_content_type")
+    private String spreadsheetFileContentType;
+
+    @Lob
+    @Column(name = "to_field")
+    private String toField;
+
+    @Lob
+    @Column(name = "cc_field")
+    private String ccField;
+
+    @Lob
+    @Column(name = "bcc_field")
+    private String bccField;
 
     @Lob
     @Column(name = "header")
@@ -97,17 +116,82 @@ public class Project implements Serializable {
         this.name = name;
     }
 
-    public String getSpreadsheetLink() {
+    public byte[] getSpreadsheetLink() {
         return this.spreadsheetLink;
     }
 
-    public Project spreadsheetLink(String spreadsheetLink) {
+    public Project spreadsheetLink(byte[] spreadsheetLink) {
         this.setSpreadsheetLink(spreadsheetLink);
         return this;
     }
 
-    public void setSpreadsheetLink(String spreadsheetLink) {
+    public void setSpreadsheetLink(byte[] spreadsheetLink) {
         this.spreadsheetLink = spreadsheetLink;
+    }
+
+    public String getSpreadsheetLinkContentType() {
+        return this.spreadsheetLinkContentType;
+    }
+
+    public Project spreadsheetLinkContentType(String spreadsheetLinkContentType) {
+        this.spreadsheetLinkContentType = spreadsheetLinkContentType;
+        return this;
+    }
+
+    public void setSpreadsheetLinkContentType(String spreadsheetLinkContentType) {
+        this.spreadsheetLinkContentType = spreadsheetLinkContentType;
+    }
+
+    public String getSpreadsheetFileContentType() {
+        return this.spreadsheetFileContentType;
+    }
+
+    public Project spreadsheetFileContentType(String spreadsheetFileContentType) {
+        this.setSpreadsheetFileContentType(spreadsheetFileContentType);
+        return this;
+    }
+
+    public void setSpreadsheetFileContentType(String spreadsheetFileContentType) {
+        this.spreadsheetFileContentType = spreadsheetFileContentType;
+    }
+
+    public String getToField() {
+        return this.toField;
+    }
+
+    public Project toField(String toField) {
+        this.setToField(toField);
+        return this;
+    }
+
+    public void setToField(String toField) {
+        this.toField = toField;
+    }
+
+    public String getCcField() {
+        return this.ccField;
+    }
+
+    public Project ccField(String ccField) {
+        this.setCcField(ccField);
+        return this;
+    }
+
+    public void setCcField(String ccField) {
+        this.ccField = ccField;
+    }
+
+    public String getBccField() {
+        return this.bccField;
+    }
+
+    public Project bccField(String bccField) {
+        this.setBccField(bccField);
+        return this;
+    }
+
+    public void setBccField(String bccField) {
+        this.bccField = bccField;
     }
 
     public String getHeader() {
@@ -294,6 +378,11 @@ public class Project implements Serializable {
             "id=" + getId() +
             ", name='" + getName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
+            ", spreadsheetLinkContentType='" + getSpreadsheetLinkContentType() + "'" +
+            ", spreadsheetFileContentType='" + getSpreadsheetFileContentType() + "'" +
+            ", toField='" + getToField() + "'" +
+            ", ccField='" + getCcField() + "'" +
+            ", bccField='" + getBccField() + "'" +
             ", header='" + getHeader() + "'" +
             ", content='" + getContent() + "'" +
             ", status='" + getStatus() + "'" +

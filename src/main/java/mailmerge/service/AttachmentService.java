@@ -95,4 +95,9 @@ public class AttachmentService {
         LOG.debug("Request to delete Attachment : {}", id);
         attachmentRepository.deleteById(id);
     }
+
+    @Transactional(readOnly = true)
+    public AttachmentDTO convertToDto(Attachment attachment) {
+        return attachmentMapper.toDto(attachment);
+    }
 }

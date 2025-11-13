@@ -75,7 +75,9 @@ class AttachmentCriteriaTest {
 
     private static void setAllFilters(AttachmentCriteria attachmentCriteria) {
         attachmentCriteria.id();
-        attachmentCriteria.content();
+        attachmentCriteria.fileContentType();
+        attachmentCriteria.name();
+        attachmentCriteria.size();
         attachmentCriteria.projectId();
         attachmentCriteria.emailId();
         attachmentCriteria.distinct();
@@ -85,7 +87,9 @@ class AttachmentCriteriaTest {
         return new Condition<>(
             criteria ->
                 condition.apply(criteria.getId()) &&
-                condition.apply(criteria.getContent()) &&
+                condition.apply(criteria.getFileContentType()) &&
+                condition.apply(criteria.getName()) &&
+                condition.apply(criteria.getSize()) &&
                 condition.apply(criteria.getProjectId()) &&
                 condition.apply(criteria.getEmailId()) &&
                 condition.apply(criteria.getDistinct()),
@@ -97,7 +101,9 @@ class AttachmentCriteriaTest {
         return new Condition<>(
             criteria ->
                 condition.apply(criteria.getId(), copy.getId()) &&
-                condition.apply(criteria.getContent(), copy.getContent()) &&
+                condition.apply(criteria.getFileContentType(), copy.getFileContentType()) &&
+                condition.apply(criteria.getName(), copy.getName()) &&
+                condition.apply(criteria.getSize(), copy.getSize()) &&
                 condition.apply(criteria.getProjectId(), copy.getProjectId()) &&
                 condition.apply(criteria.getEmailId(), copy.getEmailId()) &&
                 condition.apply(criteria.getDistinct(), copy.getDistinct()),

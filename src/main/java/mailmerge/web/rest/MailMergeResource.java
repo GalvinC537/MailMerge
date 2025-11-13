@@ -1,5 +1,3 @@
-// Called from project.service.ts and then calls MailMergeService.java
-
 package mailmerge.web.rest;
 
 import mailmerge.service.MailMergeService;
@@ -9,6 +7,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.List;
+import java.util.Map;
+
+/**
+ * REST controller for mail merge sending.
+ */
 @RestController
 @RequestMapping("/api/mail-merge")
 public class MailMergeResource {
@@ -21,19 +25,53 @@ public class MailMergeResource {
     }
 
     /**
-     * Expects multipart/form-data:
-     *  - file: Excel file (.xlsx)
-     *  - subjectTemplate: String (e.g. "Hello {{name}}")
-     *  - bodyTemplate: String (e.g. "Dear {{name}}, your course is {{course}}")
+     *  OLD endpoint: supports multipart form-data upload
+     * (kept for backward compatibility)
      */
     @PostMapping("/send")
-    public ResponseEntity<Void> sendMailMerge(
-        @RequestPart("file") MultipartFile file,
-        @RequestPart("subjectTemplate") String subjectTemplate,
-        @RequestPart("bodyTemplate") String bodyTemplate
+    public ResponseEntity<Void> sendMailMergeLegacy(
+            @RequestPart("file") MultipartFile file,
+            @RequestPart("subjectTemplate") String subjectTemplate,
+            @RequestPart("bodyTemplate") String bodyTemplate
     ) throws Exception {
-        log.debug("REST request to send mail merge using file: {}", file.getOriginalFilename());
+        log.debug("REST request (legacy) to send mail merge using file: {}", file.getOriginalFilename());
         mailMergeService.sendMailMerge(file, subjectTemplate, bodyTemplate);
         return ResponseEntity.ok().build();
+    }
+
+    /**
+     *  NEW endpoint: handles JSON payload with to/cc/bcc/attachments
+     *
+     * Called from sendMailMergeWithMeta() in project.service.ts
+     */
+    @PostMapping("/send-advanced")
+    public ResponseEntity<Void> sendMailMergeAdvanced(@RequestBody Map<String, Object> payload) {
+        log.debug("REST request to send mail merge with full metadata");
+
+        String subjectTemplate = (String) payload.get("subjectTemplate");
+        String bodyTemplate = (String) payload.get("bodyTemplate");
+        String toTemplate = (String) payload.get("toTemplate");
+        String ccTemplate = (String) payload.get("ccTemplate");
+        String bccTemplate = (String) payload.get("bccTemplate");
+        String spreadsheetBase64 = (String) payload.get("spreadsheet");
+        String spreadsheetFileContentType = (String) payload.get("spreadsheetFileContentType");
+        List<Map<String, String>> attachments = (List<Map<String, String>>) payload.get("attachments");
+
+        try {
+            mailMergeService.sendMailMergeAdvanced(
+                    subjectTemplate,
+                    bodyTemplate,
+                    toTemplate,
+                    ccTemplate,
+                    bccTemplate,
+                    spreadsheetBase64,
+                    spreadsheetFileContentType,
+                    attachments
+            );
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            log.error("❌ Failed to process advanced mail merge", e);
+            throw new RuntimeException("Mail merge failed: " + e.getMessage(), e);
+        }
     }
 }

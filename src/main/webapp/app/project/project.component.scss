@@ -11,7 +11,7 @@ $danger-red: #dc3545;
   padding-top: 3rem;
 }
 
-/* Center and style the "New Project" button */
+/* Center and style the "Create" button */
 .new-project-btn {
   background-color: #ffffff;
   color: $primary-blue;
@@ -20,6 +20,7 @@ $danger-red: #dc3545;
   padding: 0.6rem 2rem;
   border-radius: 6px;
   transition: all 0.2s ease-in-out;
+  margin-top: 20px;
 
   &:hover {
     background-color: $primary-blue;

@@ -17,7 +17,22 @@
             <column name="name" type="varchar(255)">
                 <constraints nullable="false" />
             </column>
-            <column name="spreadsheet_link" type="varchar(255)">
+            <column name="spreadsheet_link" type="${blobType}">
+                <constraints nullable="true" />
+            </column>
+            <column name="spreadsheet_link_content_type" type="varchar(255)">
+                <constraints nullable="true" />
+            </column>
+            <column name="spreadsheet_file_content_type" type="varchar(255)">
+                <constraints nullable="true" />
+            </column>
+            <column name="to_field" type="${clobType}">
+                <constraints nullable="true" />
+            </column>
+            <column name="cc_field" type="${clobType}">
+                <constraints nullable="true" />
+            </column>
+            <column name="bcc_field" type="${clobType}">
                 <constraints nullable="true" />
             </column>
             <column name="header" type="${clobType}">
@@ -58,7 +73,12 @@
                   usePreparedStatements="true">
             <column name="id" type="numeric"/>
             <column name="name" type="string"/>
-            <column name="spreadsheet_link" type="string"/>
+            <column name="spreadsheet_link" type="blob"/>
+            <column name="spreadsheet_link_content_type" type="string"/>
+            <column name="spreadsheet_file_content_type" type="string"/>
+            <column name="to_field" type="clob"/>
+            <column name="cc_field" type="clob"/>
+            <column name="bcc_field" type="clob"/>
             <column name="header" type="clob"/>
             <column name="content" type="clob"/>
             <column name="status" type="string"/>

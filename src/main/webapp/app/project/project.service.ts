@@ -7,10 +7,14 @@ import { Observable } from 'rxjs';
 export interface Project {
   id?: number;
   name: string;
-  spreadsheetLink?: string;
+  spreadsheetLink?: string | null;
   header?: string;
   content?: string;
   status?: 'PENDING' | 'SENT' | 'FAILED';
+  toField?: string;
+  ccField?: string;
+  bccField?: string;
+  spreadsheetFileContentType?: string | null;
   sentAt?: string;
   user?: any;
 }
@@ -63,5 +67,19 @@ export class ProjectService {
     formData.append('subjectTemplate', subjectTemplate);
     formData.append('bodyTemplate', bodyTemplate);
     return this.http.post('/api/mail-merge/send', formData);
+  }
+
+  // Enhanced version: sends full metadata (To, CC, BCC, attachments, spreadsheet)
+  sendMailMergeWithMeta(payload: {
+    subjectTemplate: string;
+    bodyTemplate: string;
+    toTemplate: string;
+    ccTemplate: string;
+    bccTemplate: string;
+    spreadsheet: string | null;
+    spreadsheetFileContentType: string | null;
+    attachments: { name: string; fileContentType: string; file: string }[];
+  }): Observable<any> {
+    return this.http.post('/api/mail-merge/send-advanced', payload);
   }
 }

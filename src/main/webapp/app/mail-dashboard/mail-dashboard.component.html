@@ -1,130 +1,235 @@
 <div class="mail-dashboard container-fluid mt-4">
-
-  <!-- This part is for the back button and the Project title which sit in the top left-->
-  <div class="back-row d-flex align-items-center mb-3 ps-3">
-    <button type="button" class="btn btn-outline-primary back-btn me-3" (click)="goBack()">⬅ Back</button>
-    <h4 class="project-title mb-0">{{ projectName || 'Untitled Project' }}</h4>
-  </div>
-  <div class="row mt-3">
-
-    <!-- This class here is for the left panel -->
-    <div class="col-md-6 left-panel">
-      <form #mergeForm="ngForm" novalidate>
-        <!-- This is for the local upload of the excel file which calls the onMergeFileChange function -->
-        <div class="mb-3">
-          <label for="mergeFile" class="form-label">Excel file (.xlsx)</label>
-          <input id="mergeFile" type="file" class="form-control" (change)="onMergeFileChange($event)" required />
-        </div>
-
-        <div *ngIf="spreadsheetHeaders?.length" class="mt-3">
-          <label class="form-label">Available Merge Fields:</label>
-          <div class="d-flex flex-wrap gap-2">
-        <span
-        *ngFor="let header of spreadsheetHeaders"
-        class="badge bg-info text-dark p-2"
-        draggable="true"
-        (dragstart)="onDragStart($event, header)"
-        >
-        {{ header }}
-        </span>
-          </div>
-          <small class="text-muted">Drag and drop these into Subject or Body fields below</small>
-        </div>
-
-        <!-- This is for text area for the input of the email subject -->
-        <div class="mb-3">
-          <label for="mergeSubject" class="form-label">Email subject</label>
-          <input
-            id="mergeSubject"
-            name="mergeSubject"
-            class="form-control"
-            type="text"
-            [(ngModel)]="mergeSubjectTemplate"
-            required
-          />
-        </div>
-
-        <!-- This is the text area for the content of the email -->
-        <div class="mb-3">
-          <label for="mergeBody" class="form-label">Email body</label>
-          <textarea
-            id="mergeBody"
-            name="mergeBody"
-            class="form-control"
-            rows="6"
-            [(ngModel)]="mergeBodyTemplate"
-            (ngModelChange)="previewMerge()"
-            required
-            (drop)="onDrop($event, 'body')"
-            (dragover)="allowDrop($event)"
-          ></textarea>
-        </div>
-
-        <!-- This is for the save and send buttons. Save calls the function saveProject and send calls the function sendProject -->
-        <div class="d-flex gap-3 mt-4">
-          <button type="button" class="btn btn-outline-primary" (click)="saveProject()" [disabled]="saving">
-            {{ saving ? ' Saving...' : ' Save' }}
-          </button>
-
-          <button type="button" class="btn btn-outline-primary" (click)="sendProject()" [disabled]="mergeSending()">
-            {{ mergeSending() ? ' Sending...' : ' Send Emails' }}
-          </button>
-        </div>
-
-        <!-- This displays the status message when saving/sending this is triggered by an event in the .ts file -->
-        <div class="mt-3">
-          <div *ngIf="saveSuccess" class="text-success fw-semibold">✅ Project saved successfully.</div>
-          <div *ngIf="sendSuccess" class="text-success fw-semibold">✅ Emails sent successfully.</div>
-          <div *ngIf="mergeErr()" class="text-danger fw-semibold">❌ Mail merge failed.</div>
-        </div>
-      </form>
+    <!-- Back button + Project title -->
+    <div class="back-row d-flex align-items-center mb-3 ps-3">
+        <button type="button" class="btn btn-outline-primary back-btn me-3" (click)="goBack()">⬅ Back</button>
+        <h4 class="project-title mb-0">{{ projectName || 'Untitled Project' }}</h4>
     </div>
 
-    <!-- This code below is for the right hand side -->
-    <!-- Below are the two buttons there at the moment when clicked it shows the content from that button -->
-    <div class="col-md-6 right-panel text-end">
-      <div class="d-flex justify-content-end gap-2 mb-3">
-        <button
-          type="button"
-          class="btn btn-outline-primary howto-btn"
-          [class.active]="howToVisible"
-          (click)="toggleHowTo()"
-        >
-           How to Use
-        </button>
+    <div class="row mt-3">
+        <!-- LEFT PANEL -->
+        <div class="col-md-6 left-panel">
+            <form #mergeForm="ngForm" novalidate>
+                <!-- Excel upload -->
+                <!-- Excel spreadsheet upload section -->
+                <div class="mb-3">
+                    <label for="mergeFile" class="form-label">Spreadsheet (.xlsx)</label>
 
-        <button
-          type="button"
-          class="btn btn-outline-primary preview-btn"
-          [class.active]="previewVisible"
-          (click)="togglePreview()"
-        >
-           Preview
-        </button>
-      </div>
+                    <!-- Upload field -->
+                    <input
+                            id="mergeFile"
+                            type="file"
+                            class="form-control"
+                            accept=".xlsx"
+                            (change)="onMergeFileChange($event)"
+                            [disabled]="!!mergeFile"
+                    />
 
-      <!-- This is the "hard-coded" how to use section -->
-      <div *ngIf="howToVisible" class="howto-section text-start">
-        <h4>How to use MailMerge</h4>
-        <p class="text-muted">
-          1️⃣ Upload an Excel file with a header row — it must include a column named <code>email</code>.<br /><br />
-          2️⃣ In your email body, use placeholders such as <code>{{'{{name}}'}}</code> or
-          <code>{{'{{course}}'}}</code> that match column names in your Excel file.<br /><br />
-          3️⃣ Click <strong>Preview</strong> to see how your personalized emails will look.<br /><br />
-          4️⃣ Click <strong>Send Emails</strong> to send them all at once.
-        </p>
-      </div>
+                    <!-- Show the uploaded file if one exists -->
+                    <div *ngIf="mergeFile" class="mt-3 border rounded p-2 bg-light d-flex justify-content-between align-items-center">
+                        <div>
+                            <fa-icon icon="file-excel" class="text-success me-2"></fa-icon>
+                            <strong>{{ mergeFile.name }}</strong>
+                            <span class="text-muted">({{ (mergeFile.size / 1024).toFixed(1) }} KB)</span>
+                        </div>
+                        <button
+                                type="button"
+                                class="btn btn-sm btn-outline-danger"
+                                (click)="removeSpreadsheet()"
+                                title="Remove spreadsheet"
+                        >
+                            <fa-icon icon="trash"></fa-icon>
+                        </button>
+                    </div>
 
-      <!-- This is there to preview all of the emails on the right hand side -->
-      <div *ngIf="previewVisible && previewEmails.length > 0" class="preview-section mt-3 text-start">
-        <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
-        <div class="preview-list">
-          <div *ngFor="let email of previewEmails" class="preview-item">
-            <strong>To:</strong> {{ email.to }}<br />
-            <pre>{{ email.body }}</pre>
-          </div>
+                    <!-- Fallback text if no file uploaded -->
+                    <div *ngIf="!mergeFile" class="mt-2 text-muted fst-italic">No spreadsheet attached.</div>
+                </div>
+
+                <!-- Available merge fields -->
+                <div *ngIf="spreadsheetHeaders?.length" class="mt-3">
+                    <label class="form-label">Available Merge Fields:</label>
+                    <div class="d-flex flex-wrap gap-2">
+            <span
+                    *ngFor="let header of spreadsheetHeaders"
+                    class="merge-field"
+                    draggable="true"
+                    (dragstart)="onDragStart($event, header)"
+            >
+              {{ header }}
+            </span>
+                    </div>
+                    <small class="text-muted">Drag and drop into any field below</small>
+                </div>
+
+                <!-- To / CC / BCC fields -->
+                <div class="mb-3">
+                    <label for="toField" class="form-label">To</label>
+                    <textarea
+                            id="toField"
+                            class="form-control"
+                            rows="2"
+                            [(ngModel)]="toField"
+                            name="toField"
+                            (drop)="onDrop($event, 'to')"
+                            (dragover)="allowDrop($event)"
+                            placeholder="e.g. {{'{{email}}'}}, or multiple separated by commas"
+                    ></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="ccField" class="form-label">CC</label>
+                    <textarea
+                            id="ccField"
+                            class="form-control"
+                            rows="2"
+                            [(ngModel)]="ccField"
+                            name="ccField"
+                            (drop)="onDrop($event, 'cc')"
+                            (dragover)="allowDrop($event)"
+                            placeholder="Optional — comma-separated"
+                    ></textarea>
+                </div>
+
+                <div class="mb-3">
+                    <label for="bccField" class="form-label">BCC</label>
+                    <textarea
+                            id="bccField"
+                            class="form-control"
+                            rows="2"
+                            [(ngModel)]="bccField"
+                            name="bccField"
+                            (drop)="onDrop($event, 'bcc')"
+                            (dragover)="allowDrop($event)"
+                            placeholder="Optional — comma-separated"
+                    ></textarea>
+                </div>
+
+                <!-- Subject -->
+                <div class="mb-3">
+                    <label for="mergeSubject" class="form-label">Email subject</label>
+                    <input
+                            id="mergeSubject"
+                            name="mergeSubject"
+                            class="form-control"
+                            type="text"
+                            [(ngModel)]="mergeSubjectTemplate"
+                            required
+                            (drop)="onDrop($event, 'subject')"
+                            (dragover)="allowDrop($event)"
+                    />
+                </div>
+
+                <!-- Body -->
+                <div class="mb-3">
+                    <label for="mergeBody" class="form-label">Email body</label>
+                    <textarea
+                            id="mergeBody"
+                            name="mergeBody"
+                            class="form-control"
+                            rows="8"
+                            [(ngModel)]="mergeBodyTemplate"
+                            (ngModelChange)="previewMerge()"
+                            required
+                            (drop)="onDrop($event, 'body')"
+                            (dragover)="allowDrop($event)"
+                    ></textarea>
+                </div>
+
+                <!-- Attachments -->
+                <div class="mb-3">
+                    <label class="form-label">Attachments</label>
+                    <input type="file" multiple class="form-control" (change)="onAttachmentsChange($event)" />
+                    <div *ngIf="attachments.length" class="mt-2">
+                        <ul class="list-unstyled">
+                            <li *ngFor="let a of attachments; let i = index" class="d-flex align-items-center gap-2">
+                                <span>{{ a.name }} ({{ a.size | number }} bytes)</span>
+                                <button type="button" class="btn btn-sm btn-outline-danger ms-auto" (click)="removeAttachment(i)">Remove</button>
+                            </li>
+                        </ul>
+                    </div>
+                    <small class="text-muted">You can attach multiple files; they will be saved with the project.</small>
+                </div>
+
+                <!-- Save / Send buttons -->
+                <div class="d-flex gap-3 mt-4">
+                    <button type="button" class="btn btn-outline-primary" (click)="saveProject()" [disabled]="saving">
+                        {{ saving ? 'Saving...' : 'Save' }}
+                    </button>
+
+                    <button type="button" class="btn btn-outline-primary" (click)="sendProject()" [disabled]="mergeSending()">
+                        {{ mergeSending() ? 'Sending...' : 'Send Emails' }}
+                    </button>
+                </div>
+
+                <!-- Status messages -->
+                <div class="mt-3">
+                    <div *ngIf="saveSuccess" class="text-success fw-semibold">✅ Project saved successfully.</div>
+                    <div *ngIf="sendSuccess" class="text-success fw-semibold">✅ Emails sent successfully.</div>
+                    <div *ngIf="mergeErr()" class="text-danger fw-semibold">❌ Mail merge failed.</div>
+                </div>
+            </form>
         </div>
-      </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="col-md-6 right-panel text-end">
+            <div class="d-flex justify-content-end gap-2 mb-3">
+                <button
+                        type="button"
+                        class="btn btn-outline-primary howto-btn"
+                        [class.active]="howToVisible"
+                        (click)="toggleHowTo()"
+                >
+                    How to Use
+                </button>
+
+                <button
+                        type="button"
+                        class="btn btn-outline-primary preview-btn"
+                        [class.active]="previewVisible"
+                        (click)="togglePreview()"
+                >
+                    Preview
+                </button>
+            </div>
+
+            <div *ngIf="howToVisible" class="howto-section text-start">
+                <h4>How to use MailMerge</h4>
+                <p class="text-muted">
+                    1️⃣ Upload an Excel file with a header row — must include a column named <code>email</code>.<br /><br />
+                    2️⃣ Use placeholders like <code>{{'{{name}}'}}</code> or <code>{{'{{course}}'}}</code>.<br /><br />
+                    3️⃣ Click <strong>Preview</strong> to see personalized emails.<br /><br />
+                    4️⃣ Click <strong>Send Emails</strong> to send them all.
+                </p>
+            </div>
+
+            <!-- Email Preview -->
+            <div *ngIf="previewVisible && previewEmails.length > 0" class="preview-section mt-3 text-start">
+                <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
+                <div class="preview-list">
+                    <div *ngFor="let email of previewEmails" class="preview-item">
+                        <div class="email-header d-flex justify-content-between align-items-center">
+                            <div>
+                                <strong>To:</strong> {{ email.to }}
+                            </div>
+                            <span class="email-date text-muted">Now</span>
+                        </div>
+
+                        <div class="email-body mt-2">
+                            <p>{{ email.body }}</p>
+                        </div>
+
+                        <!-- Attachments section -->
+                        <div *ngIf="email.attachments?.length" class="attachments mt-2">
+                            <strong>Attachments:</strong>
+                            <ul class="list-unstyled mt-1 mb-0">
+                                <li *ngFor="let file of email.attachments" class="attachment-item">
+                                    📎 {{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-  </div>
 </div>

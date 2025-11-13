@@ -76,7 +76,7 @@ class ProjectCriteriaTest {
     private static void setAllFilters(ProjectCriteria projectCriteria) {
         projectCriteria.id();
         projectCriteria.name();
-        projectCriteria.spreadsheetLink();
+        projectCriteria.spreadsheetFileContentType();
         projectCriteria.status();
         projectCriteria.sentAt();
         projectCriteria.headingsId();
@@ -91,7 +91,7 @@ class ProjectCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId()) &&
                 condition.apply(criteria.getName()) &&
-                condition.apply(criteria.getSpreadsheetLink()) &&
+                condition.apply(criteria.getSpreadsheetFileContentType()) &&
                 condition.apply(criteria.getStatus()) &&
                 condition.apply(criteria.getSentAt()) &&
                 condition.apply(criteria.getHeadingsId()) &&
@@ -108,7 +108,7 @@ class ProjectCriteriaTest {
             criteria ->
                 condition.apply(criteria.getId(), copy.getId()) &&
                 condition.apply(criteria.getName(), copy.getName()) &&
-                condition.apply(criteria.getSpreadsheetLink(), copy.getSpreadsheetLink()) &&
+                condition.apply(criteria.getSpreadsheetFileContentType(), copy.getSpreadsheetFileContentType()) &&
                 condition.apply(criteria.getStatus(), copy.getStatus()) &&
                 condition.apply(criteria.getSentAt(), copy.getSentAt()) &&
                 condition.apply(criteria.getHeadingsId(), copy.getHeadingsId()) &&

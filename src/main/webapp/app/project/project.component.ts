@@ -19,12 +19,12 @@ export class ProjectComponent implements OnInit {
   private readonly projectService = inject(ProjectService);
   private readonly router = inject(Router);
 
-  //when component is intilaised the loadProjects function is called
+  // when component is intilaised the loadProjects function is called
   ngOnInit(): void {
     this.loadProjects();
   }
 
-  //Load all user projects
+  // Load all user projects
   loadProjects(): void {
     this.projectService.findMy().subscribe({
       next: projects => (this.projects = projects),

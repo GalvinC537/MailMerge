@@ -10,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.EntityManager;
+import java.util.Base64;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import mailmerge.IntegrationTest;
@@ -37,8 +38,17 @@ import org.springframework.transaction.annotation.Transactional;
 @WithMockUser
 class AttachmentResourceIT {
 
-    private static final String DEFAULT_CONTENT = "AAAAAAAAAA";
-    private static final String UPDATED_CONTENT = "BBBBBBBBBB";
+    private static final byte[] DEFAULT_FILE = TestUtil.createByteArray(1, "0");
+    private static final byte[] UPDATED_FILE = TestUtil.createByteArray(1, "1");
+    private static final String DEFAULT_FILE_CONTENT_TYPE = "image/jpg";
+    private static final String UPDATED_FILE_CONTENT_TYPE = "image/png";
+
+    private static final String DEFAULT_NAME = "AAAAAAAAAA";
+    private static final String UPDATED_NAME = "BBBBBBBBBB";
+
+    private static final Long DEFAULT_SIZE = 1L;
+    private static final Long UPDATED_SIZE = 2L;
+    private static final Long SMALLER_SIZE = 1L - 1L;
 
     private static final String ENTITY_API_URL = "/api/attachments";
     private static final String ENTITY_API_URL_ID = ENTITY_API_URL + "/{id}";
@@ -72,7 +82,12 @@ class AttachmentResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Attachment createEntity() {
-        return new Attachment().content(DEFAULT_CONTENT);
+        return new Attachment()
+            .file(DEFAULT_FILE)
+            .fileContentType(DEFAULT_FILE_CONTENT_TYPE)
+            .fileContentType(DEFAULT_FILE_CONTENT_TYPE)
+            .name(DEFAULT_NAME)
+            .size(DEFAULT_SIZE);
     }
 
     /**
@@ -82,7 +97,12 @@ class AttachmentResourceIT {
      * if they test an entity which requires the current entity.
      */
     public static Attachment createUpdatedEntity() {
-        return new Attachment().content(UPDATED_CONTENT);
+        return new Attachment()
+            .file(UPDATED_FILE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .name(UPDATED_NAME)
+            .size(UPDATED_SIZE);
     }
 
     @BeforeEach
@@ -144,6 +164,23 @@ class AttachmentResourceIT {
 
     @Test
     @Transactional
+    void checkNameIsRequired() throws Exception {
+        long databaseSizeBeforeTest = getRepositoryCount();
+        // set the field null
+        attachment.setName(null);
+
+        // Create the Attachment, which fails.
+        AttachmentDTO attachmentDTO = attachmentMapper.toDto(attachment);
+
+        restAttachmentMockMvc
+            .perform(post(ENTITY_API_URL).with(csrf()).contentType(MediaType.APPLICATION_JSON).content(om.writeValueAsBytes(attachmentDTO)))
+            .andExpect(status().isBadRequest());
+
+        assertSameRepositoryCount(databaseSizeBeforeTest);
+    }
+
+    @Test
+    @Transactional
     void getAllAttachments() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
@@ -154,7 +191,11 @@ class AttachmentResourceIT {
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(attachment.getId().intValue())))
-            .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT)));
+            .andExpect(jsonPath("$.[*].fileContentType").value(hasItem(DEFAULT_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].file").value(hasItem(Base64.getEncoder().encodeToString(DEFAULT_FILE))))
+            .andExpect(jsonPath("$.[*].fileContentType").value(hasItem(DEFAULT_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
+            .andExpect(jsonPath("$.[*].size").value(hasItem(DEFAULT_SIZE.intValue())));
     }
 
     @Test
@@ -169,7 +210,11 @@ class AttachmentResourceIT {
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(attachment.getId().intValue()))
-            .andExpect(jsonPath("$.content").value(DEFAULT_CONTENT));
+            .andExpect(jsonPath("$.fileContentType").value(DEFAULT_FILE_CONTENT_TYPE))
+            .andExpect(jsonPath("$.file").value(Base64.getEncoder().encodeToString(DEFAULT_FILE)))
+            .andExpect(jsonPath("$.fileContentType").value(DEFAULT_FILE_CONTENT_TYPE))
+            .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
+            .andExpect(jsonPath("$.size").value(DEFAULT_SIZE.intValue()));
     }
 
     @Test
@@ -189,52 +234,184 @@ class AttachmentResourceIT {
 
     @Test
     @Transactional
-    void getAllAttachmentsByContentIsEqualToSomething() throws Exception {
+    void getAllAttachmentsByFileContentTypeIsEqualToSomething() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Get all the attachmentList where content equals to
-        defaultAttachmentFiltering("content.equals=" + DEFAULT_CONTENT, "content.equals=" + UPDATED_CONTENT);
+        // Get all the attachmentList where fileContentType equals to
+        defaultAttachmentFiltering(
+            "fileContentType.equals=" + DEFAULT_FILE_CONTENT_TYPE,
+            "fileContentType.equals=" + UPDATED_FILE_CONTENT_TYPE
+        );
     }
 
     @Test
     @Transactional
-    void getAllAttachmentsByContentIsInShouldWork() throws Exception {
+    void getAllAttachmentsByFileContentTypeIsInShouldWork() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Get all the attachmentList where content in
-        defaultAttachmentFiltering("content.in=" + DEFAULT_CONTENT + "," + UPDATED_CONTENT, "content.in=" + UPDATED_CONTENT);
+        // Get all the attachmentList where fileContentType in
+        defaultAttachmentFiltering(
+            "fileContentType.in=" + DEFAULT_FILE_CONTENT_TYPE + "," + UPDATED_FILE_CONTENT_TYPE,
+            "fileContentType.in=" + UPDATED_FILE_CONTENT_TYPE
+        );
     }
 
     @Test
     @Transactional
-    void getAllAttachmentsByContentIsNullOrNotNull() throws Exception {
+    void getAllAttachmentsByFileContentTypeIsNullOrNotNull() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Get all the attachmentList where content is not null
-        defaultAttachmentFiltering("content.specified=true", "content.specified=false");
+        // Get all the attachmentList where fileContentType is not null
+        defaultAttachmentFiltering("fileContentType.specified=true", "fileContentType.specified=false");
     }
 
     @Test
     @Transactional
-    void getAllAttachmentsByContentContainsSomething() throws Exception {
+    void getAllAttachmentsByFileContentTypeContainsSomething() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Get all the attachmentList where content contains
-        defaultAttachmentFiltering("content.contains=" + DEFAULT_CONTENT, "content.contains=" + UPDATED_CONTENT);
+        // Get all the attachmentList where fileContentType contains
+        defaultAttachmentFiltering(
+            "fileContentType.contains=" + DEFAULT_FILE_CONTENT_TYPE,
+            "fileContentType.contains=" + UPDATED_FILE_CONTENT_TYPE
+        );
     }
 
     @Test
     @Transactional
-    void getAllAttachmentsByContentNotContainsSomething() throws Exception {
+    void getAllAttachmentsByFileContentTypeNotContainsSomething() throws Exception {
         // Initialize the database
         insertedAttachment = attachmentRepository.saveAndFlush(attachment);
 
-        // Get all the attachmentList where content does not contain
-        defaultAttachmentFiltering("content.doesNotContain=" + UPDATED_CONTENT, "content.doesNotContain=" + DEFAULT_CONTENT);
+        // Get all the attachmentList where fileContentType does not contain
+        defaultAttachmentFiltering(
+            "fileContentType.doesNotContain=" + UPDATED_FILE_CONTENT_TYPE,
+            "fileContentType.doesNotContain=" + DEFAULT_FILE_CONTENT_TYPE
+        );
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByNameIsEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where name equals to
+        defaultAttachmentFiltering("name.equals=" + DEFAULT_NAME, "name.equals=" + UPDATED_NAME);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByNameIsInShouldWork() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where name in
+        defaultAttachmentFiltering("name.in=" + DEFAULT_NAME + "," + UPDATED_NAME, "name.in=" + UPDATED_NAME);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByNameIsNullOrNotNull() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where name is not null
+        defaultAttachmentFiltering("name.specified=true", "name.specified=false");
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByNameContainsSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where name contains
+        defaultAttachmentFiltering("name.contains=" + DEFAULT_NAME, "name.contains=" + UPDATED_NAME);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsByNameNotContainsSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where name does not contain
+        defaultAttachmentFiltering("name.doesNotContain=" + UPDATED_NAME, "name.doesNotContain=" + DEFAULT_NAME);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size equals to
+        defaultAttachmentFiltering("size.equals=" + DEFAULT_SIZE, "size.equals=" + UPDATED_SIZE);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsInShouldWork() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size in
+        defaultAttachmentFiltering("size.in=" + DEFAULT_SIZE + "," + UPDATED_SIZE, "size.in=" + UPDATED_SIZE);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsNullOrNotNull() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size is not null
+        defaultAttachmentFiltering("size.specified=true", "size.specified=false");
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsGreaterThanOrEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size is greater than or equal to
+        defaultAttachmentFiltering("size.greaterThanOrEqual=" + DEFAULT_SIZE, "size.greaterThanOrEqual=" + UPDATED_SIZE);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsLessThanOrEqualToSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size is less than or equal to
+        defaultAttachmentFiltering("size.lessThanOrEqual=" + DEFAULT_SIZE, "size.lessThanOrEqual=" + SMALLER_SIZE);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsLessThanSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size is less than
+        defaultAttachmentFiltering("size.lessThan=" + UPDATED_SIZE, "size.lessThan=" + DEFAULT_SIZE);
+    }
+
+    @Test
+    @Transactional
+    void getAllAttachmentsBySizeIsGreaterThanSomething() throws Exception {
+        // Initialize the database
+        insertedAttachment = attachmentRepository.saveAndFlush(attachment);
+
+        // Get all the attachmentList where size is greater than
+        defaultAttachmentFiltering("size.greaterThan=" + SMALLER_SIZE, "size.greaterThan=" + DEFAULT_SIZE);
     }
 
     @Test
@@ -295,7 +472,11 @@ class AttachmentResourceIT {
             .andExpect(status().isOk())
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(attachment.getId().intValue())))
-            .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT)));
+            .andExpect(jsonPath("$.[*].fileContentType").value(hasItem(DEFAULT_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].file").value(hasItem(Base64.getEncoder().encodeToString(DEFAULT_FILE))))
+            .andExpect(jsonPath("$.[*].fileContentType").value(hasItem(DEFAULT_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
+            .andExpect(jsonPath("$.[*].size").value(hasItem(DEFAULT_SIZE.intValue())));
 
         // Check, that the count call also returns 1
         restAttachmentMockMvc
@@ -343,7 +524,12 @@ class AttachmentResourceIT {
         Attachment updatedAttachment = attachmentRepository.findById(attachment.getId()).orElseThrow();
         // Disconnect from session so that the updates on updatedAttachment are not directly saved in db
         em.detach(updatedAttachment);
-        updatedAttachment.content(UPDATED_CONTENT);
+        updatedAttachment
+            .file(UPDATED_FILE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .name(UPDATED_NAME)
+            .size(UPDATED_SIZE);
         AttachmentDTO attachmentDTO = attachmentMapper.toDto(updatedAttachment);
 
         restAttachmentMockMvc
@@ -466,7 +652,12 @@ class AttachmentResourceIT {
         Attachment partialUpdatedAttachment = new Attachment();
         partialUpdatedAttachment.setId(attachment.getId());
 
-        partialUpdatedAttachment.content(UPDATED_CONTENT);
+        partialUpdatedAttachment
+            .file(UPDATED_FILE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .fileContentType(UPDATED_FILE_CONTENT_TYPE)
+            .name(UPDATED_NAME)
+            .size(UPDATED_SIZE);
 
         restAttachmentMockMvc
             .perform(

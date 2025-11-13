@@ -1,5 +1,7 @@
 package mailmerge.service.dto;
 
+import jakarta.persistence.Lob;
+import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import java.util.Objects;
 
@@ -11,7 +13,16 @@ public class AttachmentDTO implements Serializable {
 
     private Long id;
 
-    private String content;
+    @Lob
+    private byte[] file;
+
+    // MIME type of the file (e.g. application/pdf, image/png)
+    private String fileContentType;
+
+    @NotNull
+    private String name;
+
+    private Long size;
 
     private ProjectDTO project;
 
@@ -25,12 +36,36 @@ public class AttachmentDTO implements Serializable {
         this.id = id;
     }
 
-    public String getContent() {
-        return content;
+    public byte[] getFile() {
+        return file;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public void setFile(byte[] file) {
+        this.file = file;
+    }
+
+    public String getFileContentType() {
+        return fileContentType;
+    }
+
+    public void setFileContentType(String fileContentType) {
+        this.fileContentType = fileContentType;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Long getSize() {
+        return size;
+    }
+
+    public void setSize(Long size) {
+        this.size = size;
     }
 
     public ProjectDTO getProject() {
@@ -75,7 +110,10 @@ public class AttachmentDTO implements Serializable {
     public String toString() {
         return "AttachmentDTO{" +
             "id=" + getId() +
-            ", content='" + getContent() + "'" +
+            ", file='" + getFile() + "'" +
+            ", fileContentType='" + getFileContentType() + "'" +
+            ", name='" + getName() + "'" +
+            ", size=" + getSize() +
             ", project=" + getProject() +
             ", email=" + getEmail() +
             "}";
