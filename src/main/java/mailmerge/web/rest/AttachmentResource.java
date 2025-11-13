@@ -1,5 +1,7 @@
 package mailmerge.web.rest;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.util.List;
@@ -57,7 +59,7 @@ public class AttachmentResource {
      * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
-    public ResponseEntity<AttachmentDTO> createAttachment(@RequestBody AttachmentDTO attachmentDTO) throws URISyntaxException {
+    public ResponseEntity<AttachmentDTO> createAttachment(@Valid @RequestBody AttachmentDTO attachmentDTO) throws URISyntaxException {
         LOG.debug("REST request to save Attachment : {}", attachmentDTO);
         if (attachmentDTO.getId() != null) {
             throw new BadRequestAlertException("A new attachment cannot already have an ID", ENTITY_NAME, "idexists");
@@ -81,7 +83,7 @@ public class AttachmentResource {
     @PutMapping("/{id}")
     public ResponseEntity<AttachmentDTO> updateAttachment(
         @PathVariable(value = "id", required = false) final Long id,
-        @RequestBody AttachmentDTO attachmentDTO
+        @Valid @RequestBody AttachmentDTO attachmentDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to update Attachment : {}, {}", id, attachmentDTO);
         if (attachmentDTO.getId() == null) {
@@ -115,7 +117,7 @@ public class AttachmentResource {
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
     public ResponseEntity<AttachmentDTO> partialUpdateAttachment(
         @PathVariable(value = "id", required = false) final Long id,
-        @RequestBody AttachmentDTO attachmentDTO
+        @NotNull @RequestBody AttachmentDTO attachmentDTO
     ) throws URISyntaxException {
         LOG.debug("REST request to partial update Attachment partially : {}, {}", id, attachmentDTO);
         if (attachmentDTO.getId() == null) {
@@ -189,5 +191,47 @@ public class AttachmentResource {
         return ResponseEntity.noContent()
             .headers(HeaderUtil.createEntityDeletionAlert(applicationName, false, ENTITY_NAME, id.toString()))
             .build();
+    }
+
+    /**
+     * {@code POST  /attachments/project/{projectId}} : Save one or more attachments for a given project.
+     *
+     * @param projectId the project ID.
+     * @param attachments list of attachments to save.
+     * @return the list of saved attachments.
+     */
+    @PostMapping("/project/{projectId}")
+    public ResponseEntity<List<AttachmentDTO>> uploadAttachmentsForProject(
+        @PathVariable Long projectId,
+        @Valid @RequestBody List<AttachmentDTO> attachments
+    ) {
+        LOG.debug("REST request to upload {} attachments for project {}", attachments.size(), projectId);
+
+        // Make sure project exists
+        if (attachments == null || attachments.isEmpty()) {
+            throw new BadRequestAlertException("No attachments provided", ENTITY_NAME, "emptyattachments");
+        }
+
+        List<AttachmentDTO> savedAttachments = attachments.stream()
+            .peek(a -> {
+                // Force link to project
+                mailmerge.service.dto.ProjectDTO project = new mailmerge.service.dto.ProjectDTO();
+                project.setId(projectId);
+                a.setProject(project);
+            })
+            .map(attachmentService::save)
+            .toList();
+
+        return ResponseEntity.ok(savedAttachments);
+    }
+
+    @GetMapping("/project/{projectId}")
+    public ResponseEntity<List<AttachmentDTO>> getAttachmentsByProject(@PathVariable Long projectId) {
+        LOG.debug("REST request to get attachments for project {}", projectId);
+        List<AttachmentDTO> list = attachmentRepository.findByProjectId(projectId)
+            .stream()
+            .map(attachmentService::convertToDto)
+            .toList();
+        return ResponseEntity.ok(list);
     }
 }

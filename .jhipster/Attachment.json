@@ -6,8 +6,22 @@
   "dto": "mapstruct",
   "fields": [
     {
-      "fieldName": "content",
+      "fieldName": "file",
+      "fieldType": "Blob",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "fileContentType",
       "fieldType": "String"
+    },
+    {
+      "fieldName": "name",
+      "fieldType": "String",
+      "fieldValidateRules": ["required"]
+    },
+    {
+      "fieldName": "size",
+      "fieldType": "Long"
     }
   ],
   "jpaMetamodelFiltering": true,

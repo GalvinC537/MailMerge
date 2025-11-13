@@ -10,17 +10,17 @@ public class ProjectTestSamples {
     private static final AtomicLong longCount = new AtomicLong(random.nextInt() + (2 * Integer.MAX_VALUE));
 
     public static Project getProjectSample1() {
-        return new Project().id(1L).name("name1").spreadsheetLink("spreadsheetLink1");
+        return new Project().id(1L).name("name1").spreadsheetFileContentType("spreadsheetFileContentType1");
     }
 
     public static Project getProjectSample2() {
-        return new Project().id(2L).name("name2").spreadsheetLink("spreadsheetLink2");
+        return new Project().id(2L).name("name2").spreadsheetFileContentType("spreadsheetFileContentType2");
     }
 
     public static Project getProjectRandomSampleGenerator() {
         return new Project()
             .id(longCount.incrementAndGet())
             .name(UUID.randomUUID().toString())
-            .spreadsheetLink(UUID.randomUUID().toString());
+            .spreadsheetFileContentType(UUID.randomUUID().toString());
     }
 }

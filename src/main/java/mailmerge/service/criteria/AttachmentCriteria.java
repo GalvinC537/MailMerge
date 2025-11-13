@@ -24,7 +24,11 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     private LongFilter id;
 
-    private StringFilter content;
+    private StringFilter fileContentType;
+
+    private StringFilter name;
+
+    private LongFilter size;
 
     private LongFilter projectId;
 
@@ -36,7 +40,9 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     public AttachmentCriteria(AttachmentCriteria other) {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
-        this.content = other.optionalContent().map(StringFilter::copy).orElse(null);
+        this.fileContentType = other.optionalFileContentType().map(StringFilter::copy).orElse(null);
+        this.name = other.optionalName().map(StringFilter::copy).orElse(null);
+        this.size = other.optionalSize().map(LongFilter::copy).orElse(null);
         this.projectId = other.optionalProjectId().map(LongFilter::copy).orElse(null);
         this.emailId = other.optionalEmailId().map(LongFilter::copy).orElse(null);
         this.distinct = other.distinct;
@@ -66,23 +72,61 @@ public class AttachmentCriteria implements Serializable, Criteria {
         this.id = id;
     }
 
-    public StringFilter getContent() {
-        return content;
+    public StringFilter getFileContentType() {
+        return fileContentType;
     }
 
-    public Optional<StringFilter> optionalContent() {
-        return Optional.ofNullable(content);
+    public Optional<StringFilter> optionalFileContentType() {
+        return Optional.ofNullable(fileContentType);
     }
 
-    public StringFilter content() {
-        if (content == null) {
-            setContent(new StringFilter());
+    public StringFilter fileContentType() {
+        if (fileContentType == null) {
+            setFileContentType(new StringFilter());
         }
-        return content;
+        return fileContentType;
     }
 
-    public void setContent(StringFilter content) {
-        this.content = content;
+    public void setFileContentType(StringFilter fileContentType) {
+        this.fileContentType = fileContentType;
+    }
+
+    public StringFilter getName() {
+        return name;
+    }
+
+    public Optional<StringFilter> optionalName() {
+        return Optional.ofNullable(name);
+    }
+
+    public StringFilter name() {
+        if (name == null) {
+            setName(new StringFilter());
+        }
+        return name;
+    }
+
+    public void setName(StringFilter name) {
+        this.name = name;
+    }
+
+    public LongFilter getSize() {
+        return size;
+    }
+
+    public Optional<LongFilter> optionalSize() {
+        return Optional.ofNullable(size);
+    }
+
+    public LongFilter size() {
+        if (size == null) {
+            setSize(new LongFilter());
+        }
+        return size;
+    }
+
+    public void setSize(LongFilter size) {
+        this.size = size;
     }
 
     public LongFilter getProjectId() {
@@ -153,7 +197,9 @@ public class AttachmentCriteria implements Serializable, Criteria {
         final AttachmentCriteria that = (AttachmentCriteria) o;
         return (
             Objects.equals(id, that.id) &&
-            Objects.equals(content, that.content) &&
+            Objects.equals(fileContentType, that.fileContentType) &&
+            Objects.equals(name, that.name) &&
+            Objects.equals(size, that.size) &&
             Objects.equals(projectId, that.projectId) &&
             Objects.equals(emailId, that.emailId) &&
             Objects.equals(distinct, that.distinct)
@@ -162,7 +208,7 @@ public class AttachmentCriteria implements Serializable, Criteria {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, content, projectId, emailId, distinct);
+        return Objects.hash(id, fileContentType, name, size, projectId, emailId, distinct);
     }
 
     // prettier-ignore
@@ -170,7 +216,9 @@ public class AttachmentCriteria implements Serializable, Criteria {
     public String toString() {
         return "AttachmentCriteria{" +
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
-            optionalContent().map(f -> "content=" + f + ", ").orElse("") +
+            optionalFileContentType().map(f -> "fileContentType=" + f + ", ").orElse("") +
+            optionalName().map(f -> "name=" + f + ", ").orElse("") +
+            optionalSize().map(f -> "size=" + f + ", ").orElse("") +
             optionalProjectId().map(f -> "projectId=" + f + ", ").orElse("") +
             optionalEmailId().map(f -> "emailId=" + f + ", ").orElse("") +
             optionalDistinct().map(f -> "distinct=" + f + ", ").orElse("") +

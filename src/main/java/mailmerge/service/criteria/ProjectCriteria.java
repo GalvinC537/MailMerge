@@ -44,7 +44,7 @@ public class ProjectCriteria implements Serializable, Criteria {
 
     private StringFilter name;
 
-    private StringFilter spreadsheetLink;
+    private StringFilter spreadsheetFileContentType;
 
     private EmailStatusFilter status;
 
@@ -65,7 +65,7 @@ public class ProjectCriteria implements Serializable, Criteria {
     public ProjectCriteria(ProjectCriteria other) {
         this.id = other.optionalId().map(LongFilter::copy).orElse(null);
         this.name = other.optionalName().map(StringFilter::copy).orElse(null);
-        this.spreadsheetLink = other.optionalSpreadsheetLink().map(StringFilter::copy).orElse(null);
+        this.spreadsheetFileContentType = other.optionalSpreadsheetFileContentType().map(StringFilter::copy).orElse(null);
         this.status = other.optionalStatus().map(EmailStatusFilter::copy).orElse(null);
         this.sentAt = other.optionalSentAt().map(InstantFilter::copy).orElse(null);
         this.headingsId = other.optionalHeadingsId().map(LongFilter::copy).orElse(null);
@@ -118,23 +118,23 @@ public class ProjectCriteria implements Serializable, Criteria {
         this.name = name;
     }
 
-    public StringFilter getSpreadsheetLink() {
-        return spreadsheetLink;
+    public StringFilter getSpreadsheetFileContentType() {
+        return spreadsheetFileContentType;
     }
 
-    public Optional<StringFilter> optionalSpreadsheetLink() {
-        return Optional.ofNullable(spreadsheetLink);
+    public Optional<StringFilter> optionalSpreadsheetFileContentType() {
+        return Optional.ofNullable(spreadsheetFileContentType);
     }
 
-    public StringFilter spreadsheetLink() {
-        if (spreadsheetLink == null) {
-            setSpreadsheetLink(new StringFilter());
+    public StringFilter spreadsheetFileContentType() {
+        if (spreadsheetFileContentType == null) {
+            setSpreadsheetFileContentType(new StringFilter());
         }
-        return spreadsheetLink;
+        return spreadsheetFileContentType;
     }
 
-    public void setSpreadsheetLink(StringFilter spreadsheetLink) {
-        this.spreadsheetLink = spreadsheetLink;
+    public void setSpreadsheetFileContentType(StringFilter spreadsheetFileContentType) {
+        this.spreadsheetFileContentType = spreadsheetFileContentType;
     }
 
     public EmailStatusFilter getStatus() {
@@ -282,7 +282,7 @@ public class ProjectCriteria implements Serializable, Criteria {
         return (
             Objects.equals(id, that.id) &&
             Objects.equals(name, that.name) &&
-            Objects.equals(spreadsheetLink, that.spreadsheetLink) &&
+            Objects.equals(spreadsheetFileContentType, that.spreadsheetFileContentType) &&
             Objects.equals(status, that.status) &&
             Objects.equals(sentAt, that.sentAt) &&
             Objects.equals(headingsId, that.headingsId) &&
@@ -295,7 +295,7 @@ public class ProjectCriteria implements Serializable, Criteria {
 
     @Override
     public int hashCode() {
-        return Objects.hash(id, name, spreadsheetLink, status, sentAt, headingsId, attachmentsId, userId, emailsId, distinct);
+        return Objects.hash(id, name, spreadsheetFileContentType, status, sentAt, headingsId, attachmentsId, userId, emailsId, distinct);
     }
 
     // prettier-ignore
@@ -304,7 +304,7 @@ public class ProjectCriteria implements Serializable, Criteria {
         return "ProjectCriteria{" +
             optionalId().map(f -> "id=" + f + ", ").orElse("") +
             optionalName().map(f -> "name=" + f + ", ").orElse("") +
-            optionalSpreadsheetLink().map(f -> "spreadsheetLink=" + f + ", ").orElse("") +
+            optionalSpreadsheetFileContentType().map(f -> "spreadsheetFileContentType=" + f + ", ").orElse("") +
             optionalStatus().map(f -> "status=" + f + ", ").orElse("") +
             optionalSentAt().map(f -> "sentAt=" + f + ", ").orElse("") +
             optionalHeadingsId().map(f -> "headingsId=" + f + ", ").orElse("") +

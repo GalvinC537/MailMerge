@@ -2,6 +2,7 @@ package mailmerge.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
+import jakarta.validation.constraints.*;
 import java.io.Serializable;
 import org.hibernate.annotations.Cache;
 import org.hibernate.annotations.CacheConcurrencyStrategy;
@@ -23,13 +24,31 @@ public class Attachment implements Serializable {
     @Column(name = "id")
     private Long id;
 
-    @Column(name = "content")
-    private String content;
+    // File content (binary)
+    @Lob
+    @Column(name = "file", nullable = false)
+    private byte[] file;
 
+    // MIME type for file (e.g. 'application/pdf', 'image/png')
+    @NotNull
+    @Column(name = "file_content_type", nullable = false)
+    private String fileContentType;
+
+    // Display name of the file
+    @NotNull
+    @Column(name = "name", nullable = false)
+    private String name;
+
+    // File size in bytes
+    @Column(name = "size")
+    private Long size;
+
+    // Project relationship
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "headings", "attachments", "user", "emails" }, allowSetters = true)
     private Project project;
 
+    // Email relationship (if applicable)
     @ManyToOne(fetch = FetchType.LAZY)
     @JsonIgnoreProperties(value = { "attachments", "project" }, allowSetters = true)
     private Email email;
@@ -49,17 +68,56 @@ public class Attachment implements Serializable {
         this.id = id;
     }
 
-    public String getContent() {
-        return this.content;
+    public byte[] getFile() {
+        return this.file;
     }
 
-    public Attachment content(String content) {
-        this.setContent(content);
+    public Attachment file(byte[] file) {
+        this.setFile(file);
         return this;
     }
 
-    public void setContent(String content) {
-        this.content = content;
+    public void setFile(byte[] file) {
+        this.file = file;
+    }
+
+    public String getFileContentType() {
+        return this.fileContentType;
+    }
+
+    public Attachment fileContentType(String fileContentType) {
+        this.fileContentType = fileContentType;
+        return this;
+    }
+
+    public void setFileContentType(String fileContentType) {
+        this.fileContentType = fileContentType;
+    }
+
+    public String getName() {
+        return this.name;
+    }
+
+    public Attachment name(String name) {
+        this.setName(name);
+        return this;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public Long getSize() {
+        return this.size;
+    }
+
+    public Attachment size(Long size) {
+        this.setSize(size);
+        return this;
+    }
+
+    public void setSize(Long size) {
+        this.size = size;
     }
 
     public Project getProject() {
@@ -112,7 +170,10 @@ public class Attachment implements Serializable {
     public String toString() {
         return "Attachment{" +
             "id=" + getId() +
-            ", content='" + getContent() + "'" +
+            ", file='" + getFile() + "'" +
+            ", fileContentType='" + getFileContentType() + "'" +
+            ", name='" + getName() + "'" +
+            ", size=" + getSize() +
             "}";
     }
 }

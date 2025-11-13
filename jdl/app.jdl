@@ -13,7 +13,11 @@ enum EmailStatus {
 // This entity is for the Users Project
 entity Project {
   name String required minlength(1) // name of project
-  spreadsheetLink String  // Blob/URL or object key
+  spreadsheetLink Blob // Store the spreadsheet that they are going to use
+  spreadsheetFileContentType String // MIME type of the uploaded file
+  toField TextBlob // Who we are sending the email to
+  ccField TextBlob // Who we are cc in the email
+  bccField TextBlob // who we are bcc in the email
   header TextBlob // header for the email
   content TextBlob // This is the actual email
   status EmailStatus //PENDING/ SENT/FAILED
@@ -22,7 +26,10 @@ entity Project {
 
 
 entity Attachment {
-  content String
+  file Blob required // the actual file
+  fileContentType String // What the file is
+  name String required // Name of the file
+  size Long // Length of the file
 }
 
 entity Heading {

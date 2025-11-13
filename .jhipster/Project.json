@@ -13,7 +13,23 @@
     },
     {
       "fieldName": "spreadsheetLink",
+      "fieldType": "Blob"
+    },
+    {
+      "fieldName": "spreadsheetFileContentType",
       "fieldType": "String"
+    },
+    {
+      "fieldName": "toField",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "ccField",
+      "fieldType": "TextBlob"
+    },
+    {
+      "fieldName": "bccField",
+      "fieldType": "TextBlob"
     },
     {
       "fieldName": "header",

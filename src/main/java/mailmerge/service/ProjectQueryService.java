@@ -80,8 +80,10 @@ public class ProjectQueryService extends QueryService<Project> {
             if (criteria.getName() != null) {
                 specification = specification.and(buildStringSpecification(criteria.getName(), Project_.name));
             }
-            if (criteria.getSpreadsheetLink() != null) {
-                specification = specification.and(buildStringSpecification(criteria.getSpreadsheetLink(), Project_.spreadsheetLink));
+            if (criteria.getSpreadsheetFileContentType() != null) {
+                specification = specification.and(
+                    buildStringSpecification(criteria.getSpreadsheetFileContentType(), Project_.spreadsheetFileContentType)
+                );
             }
             if (criteria.getStatus() != null) {
                 specification = specification.and(buildSpecification(criteria.getStatus(), Project_.status));

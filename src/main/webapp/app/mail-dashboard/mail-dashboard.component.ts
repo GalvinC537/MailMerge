@@ -1,7 +1,8 @@
-import { Component, OnInit, AfterViewInit, inject, signal } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { Router, ActivatedRoute, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
-import * as XLSX from 'xlsx'; // imported to handle excel file parsing for mailmerge input
+import * as XLSX from 'xlsx';
+import { HttpClient } from '@angular/common/http';
 
 import SharedModule from 'app/shared/shared.module';
 import { ProjectService, Project } from 'app/project/project.service';
@@ -17,37 +18,50 @@ import { Account } from 'app/core/auth/account.model';
   imports: [SharedModule, RouterModule, FormsModule],
 })
 export class MailDashboardComponent implements OnInit {
-  // store loggined in user under account and the project object and id itself
-
   account = signal<Account | null>(null);
   projectId: number | null = null;
   project: Project | null = null;
-  // Below holds the form values like its name etc
+
   projectName = '';
   mergeSubjectTemplate = '';
   mergeBodyTemplate = '';
   mergeFile: File | null = null;
-  // Below used to track the sending state
+  mergeFileName: string | null = null;
+
+  // spreadsheet blob
+  spreadsheetBase64: string | null = null;
+  spreadsheetFileContentType: string | null = null;
+
+  // New email fields
+  toField = '';
+  ccField = '';
+  bccField = '';
+
+  // Attachments
+  attachments: { name: string; size: number; fileContentType: string; base64: string }[] = [];
+
   mergeSending = signal(false);
   mergeOk = signal(false);
   mergeErr = signal(false);
-  // Flags set for UI used later on
   saving = false;
   saveSuccess = false;
   sendSuccess = false;
 
-  previewEmails: { to: string; body: string }[] = [];
+  spreadsheetHeaders: string[] = [];
+  previewEmails: {
+    to: string;
+    body: string;
+    attachments: { name: string; size: number; fileContentType: string; base64: string }[];
+  }[] = [];
   previewVisible = true;
   howToVisible = false;
-  spreadsheetHeaders: string[] = []; // This is for the headers used for the drag and drop feature
 
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
   private readonly loginService = inject(LoginService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
-
-  // This is loaded when the component is intialised and it fetches the current logged in user, extracts project ID and loads the project
+  private readonly http = inject(HttpClient);
 
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => this.account.set(account));
@@ -61,25 +75,70 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
-  //This runs once the view has rendered — show initial preview automatically
-  ngAfterViewInit(): void {
-    setTimeout(() => this.previewMerge(), 500); // delay ensures template is ready
-  }
-
-  // This function is the back button which allows the user to go back to the project page
+  /** Redirects back to the project page **/
   goBack(): void {
     void this.router.navigate(['/project']);
   }
-  // redirects to the login page if user is not authenticated
+
+  /** Makes the user log in  **/
   login(): void {
     this.loginService.login();
   }
-  // WHen user uploads excel file this is called and stores the uploaded file in this.mergefile
+
+  /** DRAG & DROP **/
+  onDragStart(event: DragEvent, header: string): void {
+    event.dataTransfer?.setData('text/plain', `{{${header}}}`);
+  }
+  allowDrop(event: DragEvent): void {
+    event.preventDefault();
+  }
+  onDrop(event: DragEvent, field: 'to' | 'cc' | 'bcc' | 'subject' | 'body'): void {
+    event.preventDefault();
+    const text = event.dataTransfer?.getData('text/plain') ?? '';
+    const elementIdMap = {
+      to: 'toField',
+      cc: 'ccField',
+      bcc: 'bccField',
+      subject: 'mergeSubject',
+      body: 'mergeBody',
+    };
+    const el = document.getElementById(elementIdMap[field]) as HTMLInputElement | HTMLTextAreaElement | null;
+    if (!el) return;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? 0;
+    const value = el.value;
+    el.value = value.slice(0, start) + text + value.slice(end);
+
+    switch (field) {
+      case 'to':
+        this.toField = el.value;
+        break;
+      case 'cc':
+        this.ccField = el.value;
+        break;
+      case 'bcc':
+        this.bccField = el.value;
+        break;
+      case 'subject':
+        this.mergeSubjectTemplate = el.value;
+        break;
+      case 'body':
+        this.mergeBodyTemplate = el.value;
+        break;
+    }
+
+    this.previewMerge();
+  }
+
+  /** Spreadsheet upload function **/
   onMergeFileChange(event: Event): void {
+    this.removeSpreadsheet();
     const input = event.target as HTMLInputElement | null;
     this.mergeFile = input?.files && input.files.length > 0 ? input.files[0] : null;
-
     if (!this.mergeFile) return;
+
+    this.mergeFileName = this.mergeFile.name;
+    this.spreadsheetFileContentType = this.mergeFile.type || 'application/octet-stream';
 
     const reader = new FileReader();
     reader.onload = e => {
@@ -90,77 +149,111 @@ export class MailDashboardComponent implements OnInit {
       const workbook = XLSX.read(data, { type: 'array' });
       const sheet = workbook.SheetNames[0];
       const sheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheet], { header: 1 });
-
-      // First row contains headers
       if (Array.isArray(sheetData) && sheetData.length > 0) {
         this.spreadsheetHeaders = (sheetData[0] as unknown as string[]).filter(h => !!h && h.trim() !== '');
       }
-
       this.previewMerge();
     };
     reader.readAsArrayBuffer(this.mergeFile);
+
+    const dataUrlReader = new FileReader();
+    dataUrlReader.onload = e => {
+      const dataUrl = (e.target as FileReader).result as string;
+      this.spreadsheetBase64 = dataUrl.split(',')[1] ?? '';
+    };
+    dataUrlReader.readAsDataURL(this.mergeFile);
   }
 
-  // Below is used for drag and drop functionality
-  onDragStart(event: DragEvent, header: string): void {
-    event.dataTransfer?.setData('text/plain', `{{${header}}}`);
+  /** Remove the currently attached spreadsheet */
+  removeSpreadsheet(): void {
+    this.mergeFile = null;
+    this.spreadsheetBase64 = null;
+    this.spreadsheetFileContentType = null;
+    this.spreadsheetHeaders = [];
+    this.previewEmails = [];
   }
 
-  allowDrop(event: DragEvent): void {
-    event.preventDefault();
+  /** This is for adding mutliple attachments **/
+  onAttachmentsChange(event: Event): void {
+    const input = event.target as HTMLInputElement | null;
+    if (!input?.files || input.files.length === 0) return;
+
+    Array.from(input.files).forEach(file => {
+      const fr = new FileReader();
+      fr.onload = e => {
+        const dataUrl = (e.target as FileReader).result as string;
+        const base64 = dataUrl.split(',')[1] ?? '';
+        this.attachments.push({
+          name: file.name,
+          size: file.size,
+          fileContentType: file.type || 'application/octet-stream',
+          base64,
+        });
+      };
+      fr.readAsDataURL(file);
+    });
   }
 
-  onDrop(event: DragEvent, field: 'subject' | 'body'): void {
-    event.preventDefault();
-    const text = event.dataTransfer?.getData('text/plain') ?? '';
-
-    if (field === 'subject') {
-      const input = document.getElementById('mergeSubject') as HTMLInputElement;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (input) {
-        const start = input.selectionStart ?? 0;
-        const end = input.selectionEnd ?? 0;
-        const value = input.value;
-        input.value = value.slice(0, start) + text + value.slice(end);
-        this.mergeSubjectTemplate = input.value;
-        this.previewMerge();
-      }
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    } else if (field === 'body') {
-      const textarea = document.getElementById('mergeBody') as HTMLTextAreaElement;
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      if (textarea) {
-        const start = textarea.selectionStart || 0;
-        const end = textarea.selectionEnd || 0;
-        const value = textarea.value;
-        textarea.value = value.slice(0, start) + text + value.slice(end);
-        this.mergeBodyTemplate = textarea.value;
-        this.previewMerge();
-      }
-    }
+  /** This is for removing attachments **/
+  removeAttachment(index: number): void {
+    this.attachments.splice(index, 1);
   }
 
-  // This function loads the project from the backend and fills in the fields based on this data
+  /** Used to load the project which was selected **/
   loadProject(id: number): void {
     this.projectService.find(id).subscribe({
-      // ^^ this calls the find function in the project.service.ts file
       next: p => {
         this.project = p;
+
+        // Load all project fields safely
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         this.projectName = p.name ?? '';
         this.mergeSubjectTemplate = p.header ?? '';
         this.mergeBodyTemplate = p.content ?? '';
+        this.toField = (p as any).toField ?? '';
+        this.ccField = (p as any).ccField ?? '';
+        this.bccField = (p as any).bccField ?? '';
+
+        // Handle spreadsheet blob from backend
+        if (p.spreadsheetLink) {
+          this.spreadsheetBase64 = p.spreadsheetLink;
+          this.spreadsheetFileContentType = (p as any).spreadsheetFileContentType ?? 'application/octet-stream';
+
+          // Optionally rebuild a File object for preview (if you want to treat it as a real file again)
+          const byteCharacters = atob(p.spreadsheetLink);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          this.mergeFile = new File([byteArray], 'uploaded_spreadsheet.xlsx', {
+            type: this.spreadsheetFileContentType!,
+          });
+
+          this.parseSpreadsheetForHeaders(this.mergeFile);
+        }
+
         this.previewMerge();
+        this.http.get<any[]>(`/api/attachments/project/${id}`).subscribe({
+          next: attachments => {
+            this.attachments = attachments.map(a => ({
+              name: a.name,
+              size: a.size,
+              fileContentType: a.fileContentType,
+              base64: a.file, // ensure backend returns the Base64
+            }));
+          },
+          error: err => console.error('❌ Failed to load attachments', err),
+        });
       },
       error: err => console.error('❌ Failed to load project', err),
     });
   }
-  // called when save button is pressed and saves the project to the backend
+
+  /** This is the function to save a project  **/
   saveProject(): void {
     if (!this.projectId) return;
-
     this.saving = true;
-    this.saveSuccess = false;
 
     const updated: Project = {
       ...(this.project ?? {}),
@@ -169,24 +262,52 @@ export class MailDashboardComponent implements OnInit {
       header: this.mergeSubjectTemplate,
       content: this.mergeBodyTemplate,
       status: 'PENDING',
+      toField: this.toField,
+      ccField: this.ccField,
+      bccField: this.bccField,
+      spreadsheetLink: this.spreadsheetBase64 ?? undefined,
+      spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
     };
-    // calls the update function in the project.service.ts
+
+    // Update project first
     this.projectService.update(updated).subscribe({
       next: proj => {
         this.project = proj;
-        this.saving = false;
-        this.saveSuccess = true;
-        setTimeout(() => (this.saveSuccess = false), 3000);
-        this.previewMerge();
+
+        //  Then upload attachments, if any
+        if (this.attachments.length > 0) {
+          const attachmentDTOs = this.attachments.map(a => ({
+            file: a.base64,
+            fileContentType: a.fileContentType,
+            name: a.name,
+            size: a.size,
+          }));
+
+          this.http.post(`/api/attachments/project/${this.projectId}`, attachmentDTOs).subscribe({
+            next: () => {
+              this.saving = false;
+              this.saveSuccess = true;
+              setTimeout(() => (this.saveSuccess = false), 3000);
+            },
+            error: err => {
+              console.error('❌ Failed to upload attachments', err);
+              this.saving = false;
+            },
+          });
+        } else {
+          this.saving = false;
+          this.saveSuccess = true;
+          setTimeout(() => (this.saveSuccess = false), 3000);
+        }
       },
       error: err => {
-        console.error('❌ Failed to save project', err);
+        console.error('❌ Save failed', err);
         this.saving = false;
       },
     });
   }
 
-  // called when sending the project
+  /** This is the button to send a project **/
   sendProject(): void {
     if (!this.projectId || !this.mergeFile) {
       this.mergeErr.set(true);
@@ -194,9 +315,7 @@ export class MailDashboardComponent implements OnInit {
     }
 
     this.mergeSending.set(true);
-    this.mergeOk.set(false);
     this.mergeErr.set(false);
-    this.sendSuccess = false;
 
     const pendingProject: Project = {
       ...(this.project ?? {}),
@@ -205,40 +324,40 @@ export class MailDashboardComponent implements OnInit {
       header: this.mergeSubjectTemplate,
       content: this.mergeBodyTemplate,
       status: 'PENDING',
+      toField: this.toField,
+      ccField: this.ccField,
+      bccField: this.bccField,
+      spreadsheetLink: this.spreadsheetBase64 ?? undefined,
+      spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
     };
-    // this updates the values in the database (so technically saving it again)
+
+    // Save the project first
     this.projectService.update(pendingProject).subscribe({
       next: () => {
-        // Here we call the sendMailMerge function in the project.service.ts file
-        this.projectService.sendMailMerge(this.mergeFile!, this.mergeSubjectTemplate, this.mergeBodyTemplate).subscribe({
-          next: () => {
-            const sentProject: Project = {
-              ...(this.project ?? {}),
-              id: this.projectId!,
-              name: this.projectName,
-              header: this.mergeSubjectTemplate,
-              content: this.mergeBodyTemplate,
-              status: 'SENT',
-              sentAt: new Date().toISOString(),
-            };
+        // Then trigger backend to send with all fields
+        const payload = {
+          subjectTemplate: this.mergeSubjectTemplate,
+          bodyTemplate: this.mergeBodyTemplate,
+          toTemplate: this.toField,
+          ccTemplate: this.ccField,
+          bccTemplate: this.bccField,
+          spreadsheet: this.spreadsheetBase64,
+          spreadsheetFileContentType: this.spreadsheetFileContentType,
+          attachments: this.attachments.map(a => ({
+            name: a.name,
+            fileContentType: a.fileContentType,
+            file: a.base64,
+          })),
+        };
 
-            this.projectService.update(sentProject).subscribe({
-              next: proj => {
-                this.project = proj;
-                this.mergeSending.set(false);
-                this.mergeOk.set(true);
-                this.sendSuccess = true;
-                setTimeout(() => (this.sendSuccess = false), 3000);
-              },
-              error: err => {
-                console.error('❌ Failed to mark SENT', err);
-                this.mergeSending.set(false);
-                this.mergeErr.set(true);
-              },
-            });
+        this.projectService.sendMailMergeWithMeta(payload).subscribe({
+          next: () => {
+            this.mergeSending.set(false);
+            this.sendSuccess = true;
+            setTimeout(() => (this.sendSuccess = false), 3000);
           },
           error: err => {
-            console.error('❌ Mail merge failed', err);
+            console.error('❌ Send failed', err);
             this.mergeSending.set(false);
             this.mergeErr.set(true);
           },
@@ -252,29 +371,12 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
-  // This toggles the email preview visibility. When clicked again "it refreshes"
-
-  togglePreview(): void {
-    // If already visible, regenerate instead of closing
-    if (this.previewVisible) {
-      this.previewMerge();
-    } else {
-      this.previewVisible = true;
-      this.howToVisible = false;
-      this.previewMerge();
-    }
-  }
-  // This toggles the how to button - no need to refresh as the content is hardcoded
-  toggleHowTo(): void {
-    this.howToVisible = !this.howToVisible;
-    if (this.howToVisible) {
-      this.previewVisible = false;
-    }
-  }
-
-  // Reads uploaded excel and parses it and extracts the first sheet
+  /** This is used to preview the merge in the right hand panel **/
   previewMerge(): void {
-    if (!this.mergeFile) return;
+    if (!this.mergeFile) {
+      this.previewEmails = [];
+      return;
+    }
 
     const reader = new FileReader();
     reader.onload = e => {
@@ -286,18 +388,75 @@ export class MailDashboardComponent implements OnInit {
       const sheet = workbook.SheetNames[0];
       const rows = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheet]);
 
-      // This part iterates over each row and replaces placeholders with actual values
       this.previewEmails = rows.map(row => {
-        let body = this.mergeBodyTemplate;
-        Object.entries(row).forEach(([key, value]) => {
-          const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-          body = body.replace(regex, String(value));
-        });
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        return { to: row.email ?? '(missing email)', body };
+        // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+        const replaceTokens = (template: string) => {
+          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+          let out = template ?? '';
+          Object.entries(row).forEach(([key, value]) => {
+            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+            out = out.replace(regex, String(value ?? ''));
+          });
+          return out;
+        };
+
+        const to = replaceTokens(this.toField) || '(missing To)';
+        const subject = replaceTokens(this.mergeSubjectTemplate);
+        const body = replaceTokens(this.mergeBodyTemplate);
+        const cc = replaceTokens(this.ccField);
+        const bcc = replaceTokens(this.bccField);
+
+        return {
+          to,
+          body: `Subject: ${subject}\nCC: ${cc}\nBCC: ${bcc}\n\n${body}`,
+          attachments: this.attachments,
+        };
       });
     };
 
     reader.readAsArrayBuffer(this.mergeFile);
+  }
+  /** This is used to turn on and off the preview **/
+  togglePreview(): void {
+    if (this.previewVisible) {
+      // already open? just regenerate so users see latest changes
+      this.previewMerge();
+    } else {
+      // switch from How To → Preview
+      this.previewVisible = true;
+      this.howToVisible = false;
+      this.previewMerge();
+    }
+  }
+
+  /** This is to turn on and off the how to page **/
+  toggleHowTo(): void {
+    this.howToVisible = !this.howToVisible;
+    if (this.howToVisible) {
+      // when How To is open, hide the preview pane
+      this.previewVisible = false;
+    }
+  }
+
+  /** Helper to parse spreadsheet headers from a File object - used when getting headers for drag and drop */
+  private parseSpreadsheetForHeaders(file: File): void {
+    const reader = new FileReader();
+    reader.onload = e => {
+      const result = (e.target as FileReader).result;
+      if (!result) return;
+
+      const data = new Uint8Array(result as ArrayBuffer);
+      const workbook = XLSX.read(data, { type: 'array' });
+      const sheet = workbook.SheetNames[0];
+      const sheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheet], { header: 1 });
+
+      if (Array.isArray(sheetData) && sheetData.length > 0) {
+        this.spreadsheetHeaders = (sheetData[0] as unknown as string[]).filter(h => !!h && h.trim() !== '');
+      }
+
+      this.previewMerge();
+    };
+    reader.readAsArrayBuffer(file);
   }
 }

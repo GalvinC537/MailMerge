@@ -1,11 +1,11 @@
-id;name;spreadsheet_link;header;content;status;sent_at
-1;deployment playfully which;recklessly within knowingly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T14:42:45
-2;teriyaki yowza;glaring;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;FAILED;2025-10-23T19:18:16
-3;outside consistency;lumbering atrium;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T22:19:53
-4;guilt boohoo;toward yippee;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T08:09:41
-5;rust;woeful;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;FAILED;2025-10-23T16:34:22
-6;now grave;oof;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-24T01:17:49
-7;overload pliers;phew devoted;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T23:06:05
-8;yahoo boo;aha;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T13:59:15
-9;meanwhile what;cute wrathful;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T06:50:49
-10;cruelty;towards;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T12:25:44
+id;name;spreadsheet_link;spreadsheet_link_content_type;spreadsheet_file_content_type;to_field;cc_field;bcc_field;header;content;status;sent_at
+1;deployment playfully which;../fake-data/blob/hipster.png;image/png;recklessly within knowingly;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T14:42:45
+2;teriyaki yowza;../fake-data/blob/hipster.png;image/png;glaring;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;FAILED;2025-10-23T19:18:16
+3;outside consistency;../fake-data/blob/hipster.png;image/png;lumbering atrium;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T22:19:53
+4;guilt boohoo;../fake-data/blob/hipster.png;image/png;toward yippee;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T08:09:41
+5;rust;../fake-data/blob/hipster.png;image/png;woeful;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;FAILED;2025-10-23T16:34:22
+6;now grave;../fake-data/blob/hipster.png;image/png;oof;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-24T01:17:49
+7;overload pliers;../fake-data/blob/hipster.png;image/png;phew devoted;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T23:06:05
+8;yahoo boo;../fake-data/blob/hipster.png;image/png;aha;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-23T13:59:15
+9;meanwhile what;../fake-data/blob/hipster.png;image/png;cute wrathful;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;SENT;2025-10-24T06:50:49
+10;cruelty;../fake-data/blob/hipster.png;image/png;towards;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;../fake-data/blob/hipster.txt;PENDING;2025-10-23T12:25:44

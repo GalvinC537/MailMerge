@@ -19,7 +19,21 @@ public class ProjectDTO implements Serializable {
     @Size(min = 1)
     private String name;
 
-    private String spreadsheetLink;
+    @Lob
+    private byte[] spreadsheetLink;
+
+    private String spreadsheetLinkContentType;
+
+    private String spreadsheetFileContentType;
+
+    @Lob
+    private String toField;
+
+    @Lob
+    private String ccField;
+
+    @Lob
+    private String bccField;
 
     @Lob
     private String header;
@@ -49,12 +63,51 @@ public class ProjectDTO implements Serializable {
         this.name = name;
     }
 
-    public String getSpreadsheetLink() {
+    public byte[] getSpreadsheetLink() {
         return spreadsheetLink;
     }
 
-    public void setSpreadsheetLink(String spreadsheetLink) {
+    public void setSpreadsheetLink(byte[] spreadsheetLink) {
         this.spreadsheetLink = spreadsheetLink;
+    }
+
+    public String getSpreadsheetFileContentType() {
+        return spreadsheetFileContentType;
+    }
+
+    public void setSpreadsheetFileContentType(String spreadsheetFileContentType) {
+        this.spreadsheetFileContentType = spreadsheetFileContentType;
+    }
+    public String getSpreadsheetLinkContentType() {
+        return spreadsheetLinkContentType;
+    }
+
+    public void setSpreadsheetLinkContentType(String spreadsheetLinkContentType) {
+        this.spreadsheetLinkContentType = spreadsheetLinkContentType;
+    }
+
+    public String getToField() {
+        return toField;
+    }
+
+    public void setToField(String toField) {
+        this.toField = toField;
+    }
+
+    public String getCcField() {
+        return ccField;
+    }
+
+    public void setCcField(String ccField) {
+        this.ccField = ccField;
+    }
+
+    public String getBccField() {
+        return bccField;
+    }
+
+    public void setBccField(String bccField) {
+        this.bccField = bccField;
     }
 
     public String getHeader() {
@@ -125,6 +178,10 @@ public class ProjectDTO implements Serializable {
             "id=" + getId() +
             ", name='" + getName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
+            ", spreadsheetFileContentType='" + getSpreadsheetFileContentType() + "'" +
+            ", toField='" + getToField() + "'" +
+            ", ccField='" + getCcField() + "'" +
+            ", bccField='" + getBccField() + "'" +
             ", header='" + getHeader() + "'" +
             ", content='" + getContent() + "'" +
             ", status='" + getStatus() + "'" +

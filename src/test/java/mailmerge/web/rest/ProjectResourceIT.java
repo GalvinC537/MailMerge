@@ -14,6 +14,7 @@ import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Base64;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicLong;
 import mailmerge.IntegrationTest;
@@ -52,8 +53,22 @@ class ProjectResourceIT {
     private static final String DEFAULT_NAME = "AAAAAAAAAA";
     private static final String UPDATED_NAME = "BBBBBBBBBB";
 
-    private static final String DEFAULT_SPREADSHEET_LINK = "AAAAAAAAAA";
-    private static final String UPDATED_SPREADSHEET_LINK = "BBBBBBBBBB";
+    private static final byte[] DEFAULT_SPREADSHEET_LINK = TestUtil.createByteArray(1, "0");
+    private static final byte[] UPDATED_SPREADSHEET_LINK = TestUtil.createByteArray(1, "1");
+    private static final String DEFAULT_SPREADSHEET_LINK_CONTENT_TYPE = "image/png";
+    private static final String UPDATED_SPREADSHEET_LINK_CONTENT_TYPE = "image/jpg";
+
+    private static final String DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE = "AAAAAAAAAA";
+    private static final String UPDATED_SPREADSHEET_FILE_CONTENT_TYPE = "BBBBBBBBBB";
+
+    private static final String DEFAULT_TO_FIELD = "AAAAAAAAAA";
+    private static final String UPDATED_TO_FIELD = "BBBBBBBBBB";
+
+    private static final String DEFAULT_CC_FIELD = "AAAAAAAAAA";
+    private static final String UPDATED_CC_FIELD = "BBBBBBBBBB";
+
+    private static final String DEFAULT_BCC_FIELD = "AAAAAAAAAA";
+    private static final String UPDATED_BCC_FIELD = "BBBBBBBBBB";
 
     private static final String DEFAULT_HEADER = "AAAAAAAAAA";
     private static final String UPDATED_HEADER = "BBBBBBBBBB";
@@ -111,6 +126,11 @@ class ProjectResourceIT {
         return new Project()
             .name(DEFAULT_NAME)
             .spreadsheetLink(DEFAULT_SPREADSHEET_LINK)
+            .spreadsheetLinkContentType(DEFAULT_SPREADSHEET_LINK_CONTENT_TYPE)
+            .spreadsheetFileContentType(DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE)
+            .toField(DEFAULT_TO_FIELD)
+            .ccField(DEFAULT_CC_FIELD)
+            .bccField(DEFAULT_BCC_FIELD)
             .header(DEFAULT_HEADER)
             .content(DEFAULT_CONTENT)
             .status(DEFAULT_STATUS)
@@ -127,6 +147,11 @@ class ProjectResourceIT {
         return new Project()
             .name(UPDATED_NAME)
             .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .spreadsheetLinkContentType(UPDATED_SPREADSHEET_LINK_CONTENT_TYPE)
+            .spreadsheetFileContentType(UPDATED_SPREADSHEET_FILE_CONTENT_TYPE)
+            .toField(UPDATED_TO_FIELD)
+            .ccField(UPDATED_CC_FIELD)
+            .bccField(UPDATED_BCC_FIELD)
             .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
             .status(UPDATED_STATUS)
@@ -221,7 +246,12 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(project.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
-            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)))
+            .andExpect(jsonPath("$.[*].spreadsheetLinkContentType").value(hasItem(DEFAULT_SPREADSHEET_LINK_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(Base64.getEncoder().encodeToString(DEFAULT_SPREADSHEET_LINK))))
+            .andExpect(jsonPath("$.[*].spreadsheetFileContentType").value(hasItem(DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].toField").value(hasItem(DEFAULT_TO_FIELD.toString())))
+            .andExpect(jsonPath("$.[*].ccField").value(hasItem(DEFAULT_CC_FIELD.toString())))
+            .andExpect(jsonPath("$.[*].bccField").value(hasItem(DEFAULT_BCC_FIELD.toString())))
             .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
             .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
@@ -247,12 +277,12 @@ class ProjectResourceIT {
 
     @Test
     @Transactional
-    @WithMockUser(username = "user") // ensures a logged-in user for test
+    @WithMockUser(username = "user") // simulate logged-in user
     void getProject() throws Exception {
         // Ensure the test user exists in the database
         User currentUser = userRepository.findOneByLogin("user").orElseGet(() -> {
             User newUser = new User();
-            newUser.setId(String.valueOf(1L)); // ✅ manually set ID
+            newUser.setId(String.valueOf(1L)); // manually set ID to avoid null PK
             newUser.setLogin("user");
             newUser.setActivated(true);
             return userRepository.saveAndFlush(newUser);
@@ -269,9 +299,14 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.id").value(project.getId().intValue()))
             .andExpect(jsonPath("$.name").value(DEFAULT_NAME))
-            .andExpect(jsonPath("$.spreadsheetLink").value(DEFAULT_SPREADSHEET_LINK))
-            .andExpect(jsonPath("$.header").value(DEFAULT_HEADER.toString()))
-            .andExpect(jsonPath("$.content").value(DEFAULT_CONTENT.toString()))
+            .andExpect(jsonPath("$.spreadsheetLinkContentType").value(DEFAULT_SPREADSHEET_LINK_CONTENT_TYPE))
+            .andExpect(jsonPath("$.spreadsheetLink").value(Base64.getEncoder().encodeToString(DEFAULT_SPREADSHEET_LINK)))
+            .andExpect(jsonPath("$.spreadsheetFileContentType").value(DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE))
+            .andExpect(jsonPath("$.toField").value(DEFAULT_TO_FIELD))
+            .andExpect(jsonPath("$.ccField").value(DEFAULT_CC_FIELD))
+            .andExpect(jsonPath("$.bccField").value(DEFAULT_BCC_FIELD))
+            .andExpect(jsonPath("$.header").value(DEFAULT_HEADER))
+            .andExpect(jsonPath("$.content").value(DEFAULT_CONTENT))
             .andExpect(jsonPath("$.status").value(DEFAULT_STATUS.toString()))
             .andExpect(jsonPath("$.sentAt").value(DEFAULT_SENT_AT.toString()));
     }
@@ -343,60 +378,63 @@ class ProjectResourceIT {
 
     @Test
     @Transactional
-    void getAllProjectsBySpreadsheetLinkIsEqualToSomething() throws Exception {
+    void getAllProjectsBySpreadsheetFileContentTypeIsEqualToSomething() throws Exception {
         // Initialize the database
         insertedProject = projectRepository.saveAndFlush(project);
 
-        // Get all the projectList where spreadsheetLink equals to
-        defaultProjectFiltering("spreadsheetLink.equals=" + DEFAULT_SPREADSHEET_LINK, "spreadsheetLink.equals=" + UPDATED_SPREADSHEET_LINK);
-    }
-
-    @Test
-    @Transactional
-    void getAllProjectsBySpreadsheetLinkIsInShouldWork() throws Exception {
-        // Initialize the database
-        insertedProject = projectRepository.saveAndFlush(project);
-
-        // Get all the projectList where spreadsheetLink in
+        // Get all the projectList where spreadsheetFileContentType equals to
         defaultProjectFiltering(
-            "spreadsheetLink.in=" + DEFAULT_SPREADSHEET_LINK + "," + UPDATED_SPREADSHEET_LINK,
-            "spreadsheetLink.in=" + UPDATED_SPREADSHEET_LINK
+            "spreadsheetFileContentType.equals=" + DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE,
+            "spreadsheetFileContentType.equals=" + UPDATED_SPREADSHEET_FILE_CONTENT_TYPE
         );
     }
 
     @Test
     @Transactional
-    void getAllProjectsBySpreadsheetLinkIsNullOrNotNull() throws Exception {
+    void getAllProjectsBySpreadsheetFileContentTypeIsInShouldWork() throws Exception {
         // Initialize the database
         insertedProject = projectRepository.saveAndFlush(project);
 
-        // Get all the projectList where spreadsheetLink is not null
-        defaultProjectFiltering("spreadsheetLink.specified=true", "spreadsheetLink.specified=false");
-    }
-
-    @Test
-    @Transactional
-    void getAllProjectsBySpreadsheetLinkContainsSomething() throws Exception {
-        // Initialize the database
-        insertedProject = projectRepository.saveAndFlush(project);
-
-        // Get all the projectList where spreadsheetLink contains
+        // Get all the projectList where spreadsheetFileContentType in
         defaultProjectFiltering(
-            "spreadsheetLink.contains=" + DEFAULT_SPREADSHEET_LINK,
-            "spreadsheetLink.contains=" + UPDATED_SPREADSHEET_LINK
+            "spreadsheetFileContentType.in=" + DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE + "," + UPDATED_SPREADSHEET_FILE_CONTENT_TYPE,
+            "spreadsheetFileContentType.in=" + UPDATED_SPREADSHEET_FILE_CONTENT_TYPE
         );
     }
 
     @Test
     @Transactional
-    void getAllProjectsBySpreadsheetLinkNotContainsSomething() throws Exception {
+    void getAllProjectsBySpreadsheetFileContentTypeIsNullOrNotNull() throws Exception {
         // Initialize the database
         insertedProject = projectRepository.saveAndFlush(project);
 
-        // Get all the projectList where spreadsheetLink does not contain
+        // Get all the projectList where spreadsheetFileContentType is not null
+        defaultProjectFiltering("spreadsheetFileContentType.specified=true", "spreadsheetFileContentType.specified=false");
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsBySpreadsheetFileContentTypeContainsSomething() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where spreadsheetFileContentType contains
         defaultProjectFiltering(
-            "spreadsheetLink.doesNotContain=" + UPDATED_SPREADSHEET_LINK,
-            "spreadsheetLink.doesNotContain=" + DEFAULT_SPREADSHEET_LINK
+            "spreadsheetFileContentType.contains=" + DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE,
+            "spreadsheetFileContentType.contains=" + UPDATED_SPREADSHEET_FILE_CONTENT_TYPE
+        );
+    }
+
+    @Test
+    @Transactional
+    void getAllProjectsBySpreadsheetFileContentTypeNotContainsSomething() throws Exception {
+        // Initialize the database
+        insertedProject = projectRepository.saveAndFlush(project);
+
+        // Get all the projectList where spreadsheetFileContentType does not contain
+        defaultProjectFiltering(
+            "spreadsheetFileContentType.doesNotContain=" + UPDATED_SPREADSHEET_FILE_CONTENT_TYPE,
+            "spreadsheetFileContentType.doesNotContain=" + DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE
         );
     }
 
@@ -497,7 +535,12 @@ class ProjectResourceIT {
             .andExpect(content().contentType(MediaType.APPLICATION_JSON_VALUE))
             .andExpect(jsonPath("$.[*].id").value(hasItem(project.getId().intValue())))
             .andExpect(jsonPath("$.[*].name").value(hasItem(DEFAULT_NAME)))
-            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(DEFAULT_SPREADSHEET_LINK)))
+            .andExpect(jsonPath("$.[*].spreadsheetLinkContentType").value(hasItem(DEFAULT_SPREADSHEET_LINK_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].spreadsheetLink").value(hasItem(Base64.getEncoder().encodeToString(DEFAULT_SPREADSHEET_LINK))))
+            .andExpect(jsonPath("$.[*].spreadsheetFileContentType").value(hasItem(DEFAULT_SPREADSHEET_FILE_CONTENT_TYPE)))
+            .andExpect(jsonPath("$.[*].toField").value(hasItem(DEFAULT_TO_FIELD.toString())))
+            .andExpect(jsonPath("$.[*].ccField").value(hasItem(DEFAULT_CC_FIELD.toString())))
+            .andExpect(jsonPath("$.[*].bccField").value(hasItem(DEFAULT_BCC_FIELD.toString())))
             .andExpect(jsonPath("$.[*].header").value(hasItem(DEFAULT_HEADER.toString())))
             .andExpect(jsonPath("$.[*].content").value(hasItem(DEFAULT_CONTENT.toString())))
             .andExpect(jsonPath("$.[*].status").value(hasItem(DEFAULT_STATUS.toString())))
@@ -552,6 +595,11 @@ class ProjectResourceIT {
         updatedProject
             .name(UPDATED_NAME)
             .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .spreadsheetLinkContentType(UPDATED_SPREADSHEET_LINK_CONTENT_TYPE)
+            .spreadsheetFileContentType(UPDATED_SPREADSHEET_FILE_CONTENT_TYPE)
+            .toField(UPDATED_TO_FIELD)
+            .ccField(UPDATED_CC_FIELD)
+            .bccField(UPDATED_BCC_FIELD)
             .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
             .status(UPDATED_STATUS)
@@ -648,7 +696,11 @@ class ProjectResourceIT {
         Project partialUpdatedProject = new Project();
         partialUpdatedProject.setId(project.getId());
 
-        partialUpdatedProject.header(UPDATED_HEADER);
+        partialUpdatedProject
+            .spreadsheetFileContentType(UPDATED_SPREADSHEET_FILE_CONTENT_TYPE)
+            .header(UPDATED_HEADER)
+            .status(UPDATED_STATUS)
+            .sentAt(UPDATED_SENT_AT);
 
         restProjectMockMvc
             .perform(
@@ -680,6 +732,11 @@ class ProjectResourceIT {
         partialUpdatedProject
             .name(UPDATED_NAME)
             .spreadsheetLink(UPDATED_SPREADSHEET_LINK)
+            .spreadsheetLinkContentType(UPDATED_SPREADSHEET_LINK_CONTENT_TYPE)
+            .spreadsheetFileContentType(UPDATED_SPREADSHEET_FILE_CONTENT_TYPE)
+            .toField(UPDATED_TO_FIELD)
+            .ccField(UPDATED_CC_FIELD)
+            .bccField(UPDATED_BCC_FIELD)
             .header(UPDATED_HEADER)
             .content(UPDATED_CONTENT)
             .status(UPDATED_STATUS)
