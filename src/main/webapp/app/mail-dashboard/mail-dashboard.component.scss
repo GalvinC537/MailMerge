@@ -220,3 +220,43 @@ $danger-red: #dc3545;
     font-size: 0.8rem;
   }
 }
+
+.email-header {
+  border-bottom: 1px solid #eee;
+  padding-bottom: 0.25rem;
+  margin-bottom: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  position: relative;
+
+  .email-date {
+    position: absolute;
+    right: 0;
+    top: 0;
+    font-size: 0.8rem;
+    color: #666;
+  }
+
+  strong {
+    min-width: 70px;
+    display: inline-block;
+  }
+}
+
+.email-header strong {
+  font-weight: 600; /* or 700 for heavier bold */
+}
+.btn-toolbar button {
+  font-weight: 600;
+  min-width: 2.2rem;
+  line-height: 1;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+
+  &:hover {
+    background-color: $hover-blue;
+  }
+}
+
+

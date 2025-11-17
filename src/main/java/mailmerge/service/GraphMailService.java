@@ -1,13 +1,11 @@
-// This is called by MailMergeService.java
-// This uses sprongs webclient to send HTTP POST request to the Microsoft Graph API in order to send the emails
-
 package mailmerge.service;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import reactor.core.publisher.Mono;
+
+import mailmerge.service.dto.AttachmentDTO;
 
 import java.util.*;
 
@@ -22,19 +20,19 @@ public class GraphMailService {
     }
 
     /**
-     * Sends a message via Microsoft Graph.
-     *
-     * @param to comma-separated "To" addresses
-     * @param cc comma-separated "CC" addresses
-     * @param bcc comma-separated "BCC" addresses
-     * @param subject subject line
-     * @param body HTML body content
-     * @param attachments list of maps with keys: name, fileContentType, file (base64)
+     * Sends a message via Microsoft Graph (BLOCKING, STABLE VERSION)
      */
-    public void sendMail(String to, String cc, String bcc, String subject, String body, List<mailmerge.service.dto.AttachmentDTO> attachments) {
+    public void sendMail(
+        String to,
+        String cc,
+        String bcc,
+        String subject,
+        String body,
+        List<AttachmentDTO> attachments
+    ) {
         try {
             log.info("📧 Sending email to={} cc={} bcc={} subject={} attachments={}",
-                    to, cc, bcc, subject, attachments != null ? attachments.size() : 0);
+                to, cc, bcc, subject, attachments != null ? attachments.size() : 0);
 
             // Convert comma-separated addresses
             List<Map<String, Object>> toRecipients = buildRecipients(to);
@@ -44,13 +42,15 @@ public class GraphMailService {
             // Convert AttachmentDTO list to Graph attachments
             List<Map<String, Object>> graphAttachments = new ArrayList<>();
             if (attachments != null) {
-                for (mailmerge.service.dto.AttachmentDTO a : attachments) {
+                for (AttachmentDTO a : attachments) {
                     if (a.getFile() == null) continue;
+
                     Map<String, Object> attach = new HashMap<>();
                     attach.put("@odata.type", "#microsoft.graph.fileAttachment");
                     attach.put("name", a.getName());
                     attach.put("contentType", a.getFileContentType());
                     attach.put("contentBytes", Base64.getEncoder().encodeToString(a.getFile()));
+
                     graphAttachments.add(attach);
                 }
             }
@@ -64,21 +64,24 @@ public class GraphMailService {
             if (!bccRecipients.isEmpty()) message.put("bccRecipients", bccRecipients);
             if (!graphAttachments.isEmpty()) message.put("attachments", graphAttachments);
 
-            Map<String, Object> payload = Map.of("message", message, "saveToSentItems", true);
+            Map<String, Object> payload = Map.of(
+                "message", message,
+                "saveToSentItems", true
+            );
 
-            // Send the email via Graph API
+            // ✅ **BLOCKING send (this is the stable version that worked before)**
             graphWebClient.post()
-                    .uri("/me/sendMail")
-                    .bodyValue(payload)
-                    .retrieve()
-                    .toBodilessEntity()
-                    .doOnSuccess(v -> log.info("✅ Email sent successfully to {}", to))
-                    .doOnError(e -> log.error("❌ Failed to send email: {}", e.getMessage()))
-                    .onErrorResume(e -> Mono.empty())
-                    .block();
+                .uri("/me/sendMail")
+                .bodyValue(payload)
+                .retrieve()
+                .toBodilessEntity()
+                .block(); // THIS was working fine
+
+            log.info("✅ Email sent successfully to {}", to);
 
         } catch (Exception e) {
-            log.error("❌ Exception in sendMail", e);
+            log.error("❌ Failed to send email: {}", e.getMessage());
+            // swallow error so mail-merge continues
         }
     }
 
@@ -86,10 +89,14 @@ public class GraphMailService {
     private List<Map<String, Object>> buildRecipients(String addresses) {
         if (addresses == null || addresses.isBlank()) return List.of();
         String[] parts = addresses.split(",\\s*");
+
         List<Map<String, Object>> recipients = new ArrayList<>();
         for (String addr : parts) {
             if (!addr.isBlank()) {
-                recipients.add(Map.of("emailAddress", Map.of("address", addr.trim())));
+                recipients.add(
+                    Map.of("emailAddress",
+                        Map.of("address", addr.trim()))
+                );
             }
         }
         return recipients;
