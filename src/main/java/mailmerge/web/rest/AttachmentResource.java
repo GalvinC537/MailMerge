@@ -36,9 +36,7 @@ public class AttachmentResource {
     private String applicationName;
 
     private final AttachmentService attachmentService;
-
     private final AttachmentRepository attachmentRepository;
-
     private final AttachmentQueryService attachmentQueryService;
 
     public AttachmentResource(
@@ -53,10 +51,6 @@ public class AttachmentResource {
 
     /**
      * {@code POST  /attachments} : Create a new attachment.
-     *
-     * @param attachmentDTO the attachmentDTO to create.
-     * @return the {@link ResponseEntity} with status {@code 201 (Created)} and with body the new attachmentDTO, or with status {@code 400 (Bad Request)} if the attachment has already an ID.
-     * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PostMapping("")
     public ResponseEntity<AttachmentDTO> createAttachment(@Valid @RequestBody AttachmentDTO attachmentDTO) throws URISyntaxException {
@@ -72,13 +66,6 @@ public class AttachmentResource {
 
     /**
      * {@code PUT  /attachments/:id} : Updates an existing attachment.
-     *
-     * @param id the id of the attachmentDTO to save.
-     * @param attachmentDTO the attachmentDTO to update.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated attachmentDTO,
-     * or with status {@code 400 (Bad Request)} if the attachmentDTO is not valid,
-     * or with status {@code 500 (Internal Server Error)} if the attachmentDTO couldn't be updated.
-     * @throws URISyntaxException if the Location URI syntax is incorrect.
      */
     @PutMapping("/{id}")
     public ResponseEntity<AttachmentDTO> updateAttachment(
@@ -92,7 +79,6 @@ public class AttachmentResource {
         if (!Objects.equals(id, attachmentDTO.getId())) {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
-
         if (!attachmentRepository.existsById(id)) {
             throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
         }
@@ -104,35 +90,25 @@ public class AttachmentResource {
     }
 
     /**
-     * {@code PATCH  /attachments/:id} : Partial updates given fields of an existing attachment, field will ignore if it is null
-     *
-     * @param id the id of the attachmentDTO to save.
-     * @param attachmentDTO the attachmentDTO to update.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the updated attachmentDTO,
-     * or with status {@code 400 (Bad Request)} if the attachmentDTO is not valid,
-     * or with status {@code 404 (Not Found)} if the attachmentDTO is not found,
-     * or with status {@code 500 (Internal Server Error)} if the attachmentDTO couldn't be updated.
-     * @throws URISyntaxException if the Location URI syntax is incorrect.
+     * {@code PATCH  /attachments/:id} : Partial updates given fields of an existing attachment.
      */
     @PatchMapping(value = "/{id}", consumes = { "application/json", "application/merge-patch+json" })
     public ResponseEntity<AttachmentDTO> partialUpdateAttachment(
         @PathVariable(value = "id", required = false) final Long id,
         @NotNull @RequestBody AttachmentDTO attachmentDTO
     ) throws URISyntaxException {
-        LOG.debug("REST request to partial update Attachment partially : {}, {}", id, attachmentDTO);
+        LOG.debug("REST request to partial update Attachment : {}, {}", id, attachmentDTO);
         if (attachmentDTO.getId() == null) {
             throw new BadRequestAlertException("Invalid id", ENTITY_NAME, "idnull");
         }
         if (!Objects.equals(id, attachmentDTO.getId())) {
             throw new BadRequestAlertException("Invalid ID", ENTITY_NAME, "idinvalid");
         }
-
         if (!attachmentRepository.existsById(id)) {
             throw new BadRequestAlertException("Entity not found", ENTITY_NAME, "idnotfound");
         }
 
         Optional<AttachmentDTO> result = attachmentService.partialUpdate(attachmentDTO);
-
         return ResponseUtil.wrapOrNotFound(
             result,
             HeaderUtil.createEntityUpdateAlert(applicationName, false, ENTITY_NAME, attachmentDTO.getId().toString())
@@ -141,23 +117,16 @@ public class AttachmentResource {
 
     /**
      * {@code GET  /attachments} : get all the attachments.
-     *
-     * @param criteria the criteria which the requested entities should match.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the list of attachments in body.
      */
     @GetMapping("")
     public ResponseEntity<List<AttachmentDTO>> getAllAttachments(AttachmentCriteria criteria) {
         LOG.debug("REST request to get Attachments by criteria: {}", criteria);
-
         List<AttachmentDTO> entityList = attachmentQueryService.findByCriteria(criteria);
         return ResponseEntity.ok().body(entityList);
     }
 
     /**
      * {@code GET  /attachments/count} : count all the attachments.
-     *
-     * @param criteria the criteria which the requested entities should match.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and the count in body.
      */
     @GetMapping("/count")
     public ResponseEntity<Long> countAttachments(AttachmentCriteria criteria) {
@@ -167,9 +136,6 @@ public class AttachmentResource {
 
     /**
      * {@code GET  /attachments/:id} : get the "id" attachment.
-     *
-     * @param id the id of the attachmentDTO to retrieve.
-     * @return the {@link ResponseEntity} with status {@code 200 (OK)} and with body the attachmentDTO, or with status {@code 404 (Not Found)}.
      */
     @GetMapping("/{id}")
     public ResponseEntity<AttachmentDTO> getAttachment(@PathVariable("id") Long id) {
@@ -180,9 +146,6 @@ public class AttachmentResource {
 
     /**
      * {@code DELETE  /attachments/:id} : delete the "id" attachment.
-     *
-     * @param id the id of the attachmentDTO to delete.
-     * @return the {@link ResponseEntity} with status {@code 204 (NO_CONTENT)}.
      */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deleteAttachment(@PathVariable("id") Long id) {
@@ -193,12 +156,12 @@ public class AttachmentResource {
             .build();
     }
 
+    // -------------------------------------------------------------------------
+    // CUSTOM PROJECT-LEVEL ENDPOINTS
+    // -------------------------------------------------------------------------
+
     /**
      * {@code POST  /attachments/project/{projectId}} : Save one or more attachments for a given project.
-     *
-     * @param projectId the project ID.
-     * @param attachments list of attachments to save.
-     * @return the list of saved attachments.
      */
     @PostMapping("/project/{projectId}")
     public ResponseEntity<List<AttachmentDTO>> uploadAttachmentsForProject(
@@ -207,14 +170,12 @@ public class AttachmentResource {
     ) {
         LOG.debug("REST request to upload {} attachments for project {}", attachments.size(), projectId);
 
-        // Make sure project exists
         if (attachments == null || attachments.isEmpty()) {
             throw new BadRequestAlertException("No attachments provided", ENTITY_NAME, "emptyattachments");
         }
 
         List<AttachmentDTO> savedAttachments = attachments.stream()
             .peek(a -> {
-                // Force link to project
                 mailmerge.service.dto.ProjectDTO project = new mailmerge.service.dto.ProjectDTO();
                 project.setId(projectId);
                 a.setProject(project);
@@ -225,10 +186,13 @@ public class AttachmentResource {
         return ResponseEntity.ok(savedAttachments);
     }
 
+    /**
+     * {@code GET  /attachments/project/{projectId}} : Get all attachments for a given project.
+     */
     @GetMapping("/project/{projectId}")
     public ResponseEntity<List<AttachmentDTO>> getAttachmentsByProject(@PathVariable Long projectId) {
         LOG.debug("REST request to get attachments for project {}", projectId);
-        List<AttachmentDTO> list = attachmentRepository.findByProjectId(projectId)
+        List<AttachmentDTO> list = attachmentRepository.findByProject_Id(projectId)
             .stream()
             .map(attachmentService::convertToDto)
             .toList();

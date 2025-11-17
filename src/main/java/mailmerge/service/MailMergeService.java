@@ -67,7 +67,7 @@ public class MailMergeService {
                 log.info("📧 (Legacy) Sending to {}", to);
                 graphMailService.sendMail(to, "", "", subject, body, Collections.emptyList());
 
-                // ✅ Delay to avoid throttling
+                // delay
                 safeDelay(2000);
             }
         }
@@ -75,14 +75,14 @@ public class MailMergeService {
 
     /** MODERN VERSION with full metadata (To, CC, BCC, Attachments, Spreadsheet) **/
     public void sendMailMergeAdvanced(
-            String subjectTemplate,
-            String bodyTemplate,
-            String toTemplate,
-            String ccTemplate,
-            String bccTemplate,
-            String spreadsheetBase64,
-            String spreadsheetFileContentType,
-            List<Map<String, String>> attachments
+        String subjectTemplate,
+        String bodyTemplate,
+        String toTemplate,
+        String ccTemplate,
+        String bccTemplate,
+        String spreadsheetBase64,
+        String spreadsheetFileContentType,
+        List<Map<String, String>> attachments
     ) throws Exception {
 
         if (spreadsheetBase64 == null || spreadsheetBase64.isEmpty()) {
@@ -153,13 +153,13 @@ public class MailMergeService {
                 }
 
                 log.info("Sending email to={} cc={} bcc={} subject={} attachments={}",
-                        to, cc, bcc, subject, attachList.size());
+                    to, cc, bcc, subject, attachList.size());
 
-                // Send email safely with retry + delay
-                safeSendWithRetry(() -> graphMailService.sendMail(to, cc, bcc, subject, body, attachList));
+                // ⬇️ IMPORTANT: Let GraphMailService handle retry internally
+                graphMailService.sendMail(to, cc, bcc, subject, body, attachList);
 
-                //  Add delay between each email
-                safeDelay(2000);
+                // Optional delay to prevent triggering throttling too fast
+                safeDelay(1000);
             }
         }
     }
@@ -169,8 +169,8 @@ public class MailMergeService {
         return switch (cell.getCellType()) {
             case STRING -> cell.getStringCellValue();
             case NUMERIC -> DateUtil.isCellDateFormatted(cell)
-                    ? cell.getDateCellValue().toString()
-                    : Double.toString(cell.getNumericCellValue());
+                ? cell.getDateCellValue().toString()
+                : Double.toString(cell.getNumericCellValue());
             case BOOLEAN -> Boolean.toString(cell.getBooleanCellValue());
             case FORMULA -> cell.getCellFormula();
             default -> "";
@@ -196,23 +196,6 @@ public class MailMergeService {
     private void safeDelay(long millis) {
         try {
             Thread.sleep(millis);
-        } catch (InterruptedException ignored) {
-        }
-    }
-
-    /** Utility: retry wrapper for Graph API throttling **/
-    private void safeSendWithRetry(Runnable sendAction) {
-        int retries = 3;
-        long delay = 2000;
-        for (int i = 1; i <= retries; i++) {
-            try {
-                sendAction.run();
-                return; // ✅ success
-            } catch (Exception e) {
-                log.warn("⚠️ Send attempt {}/{} failed: {}", i, retries, e.getMessage());
-                if (i < retries) safeDelay(delay * i); // exponential backoff
-                else log.error("❌ Giving up after {} retries", retries);
-            }
-        }
+        } catch (InterruptedException ignored) {}
     }
 }

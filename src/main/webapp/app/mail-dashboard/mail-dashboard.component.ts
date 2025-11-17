@@ -9,6 +9,9 @@ import { ProjectService, Project } from 'app/project/project.service';
 import { AccountService } from 'app/core/auth/account.service';
 import { LoginService } from 'app/login/login.service';
 import { Account } from 'app/core/auth/account.model';
+import { DomSanitizer } from '@angular/platform-browser';
+import { AttachmentService } from 'app/project/attachment.service';
+import { forkJoin, of, switchMap, tap } from 'rxjs';
 
 @Component({
   standalone: true,
@@ -28,17 +31,15 @@ export class MailDashboardComponent implements OnInit {
   mergeFile: File | null = null;
   mergeFileName: string | null = null;
 
-  // spreadsheet blob
   spreadsheetBase64: string | null = null;
   spreadsheetFileContentType: string | null = null;
 
-  // New email fields
   toField = '';
   ccField = '';
   bccField = '';
 
-  // Attachments
-  attachments: { name: string; size: number; fileContentType: string; base64: string }[] = [];
+  attachments: { id?: number; name: string; size: number; fileContentType: string; base64: string }[] = [];
+  deletedAttachmentIds: number[] = [];
 
   mergeSending = signal(false);
   mergeOk = signal(false);
@@ -46,15 +47,23 @@ export class MailDashboardComponent implements OnInit {
   saving = false;
   saveSuccess = false;
   sendSuccess = false;
+  attachmentsLoading = false;
 
   spreadsheetHeaders: string[] = [];
   previewEmails: {
     to: string;
+    cc: string;
+    bcc: string;
+    subject: string;
     body: string;
     attachments: { name: string; size: number; fileContentType: string; base64: string }[];
   }[] = [];
   previewVisible = true;
   howToVisible = false;
+
+  sendingProgress = 0;
+  sendingTotal = 0;
+  sendingInProgress = false;
 
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
@@ -62,6 +71,8 @@ export class MailDashboardComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly http = inject(HttpClient);
+  private readonly sanitizer = inject(DomSanitizer);
+  private readonly attachmentService = inject(AttachmentService);
 
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => this.account.set(account));
@@ -75,17 +86,14 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
-  /** Redirects back to the project page **/
   goBack(): void {
     void this.router.navigate(['/project']);
   }
 
-  /** Makes the user log in  **/
   login(): void {
     this.loginService.login();
   }
 
-  /** DRAG & DROP **/
   onDragStart(event: DragEvent, header: string): void {
     event.dataTransfer?.setData('text/plain', `{{${header}}}`);
   }
@@ -130,7 +138,6 @@ export class MailDashboardComponent implements OnInit {
     this.previewMerge();
   }
 
-  /** Spreadsheet upload function **/
   onMergeFileChange(event: Event): void {
     this.removeSpreadsheet();
     const input = event.target as HTMLInputElement | null;
@@ -164,7 +171,6 @@ export class MailDashboardComponent implements OnInit {
     dataUrlReader.readAsDataURL(this.mergeFile);
   }
 
-  /** Remove the currently attached spreadsheet */
   removeSpreadsheet(): void {
     this.mergeFile = null;
     this.spreadsheetBase64 = null;
@@ -173,7 +179,6 @@ export class MailDashboardComponent implements OnInit {
     this.previewEmails = [];
   }
 
-  /** This is for adding mutliple attachments **/
   onAttachmentsChange(event: Event): void {
     const input = event.target as HTMLInputElement | null;
     if (!input?.files || input.files.length === 0) return;
@@ -194,18 +199,17 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
-  /** This is for removing attachments **/
   removeAttachment(index: number): void {
-    this.attachments.splice(index, 1);
+    const removed = this.attachments.splice(index, 1)[0];
+    if (removed.id) {
+      this.deletedAttachmentIds.push(removed.id);
+    }
   }
 
-  /** Used to load the project which was selected **/
   loadProject(id: number): void {
     this.projectService.find(id).subscribe({
       next: p => {
         this.project = p;
-
-        // Load all project fields safely
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         this.projectName = p.name ?? '';
         this.mergeSubjectTemplate = p.header ?? '';
@@ -214,43 +218,45 @@ export class MailDashboardComponent implements OnInit {
         this.ccField = (p as any).ccField ?? '';
         this.bccField = (p as any).bccField ?? '';
 
-        // Handle spreadsheet blob from backend
         if (p.spreadsheetLink) {
           this.spreadsheetBase64 = p.spreadsheetLink;
           this.spreadsheetFileContentType = (p as any).spreadsheetFileContentType ?? 'application/octet-stream';
-
-          // Optionally rebuild a File object for preview (if you want to treat it as a real file again)
           const byteCharacters = atob(p.spreadsheetLink);
           const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) {
-            byteNumbers[i] = byteCharacters.charCodeAt(i);
-          }
+          for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
           const byteArray = new Uint8Array(byteNumbers);
           this.mergeFile = new File([byteArray], 'uploaded_spreadsheet.xlsx', {
             type: this.spreadsheetFileContentType!,
           });
-
           this.parseSpreadsheetForHeaders(this.mergeFile);
         }
 
-        this.previewMerge();
-        this.http.get<any[]>(`/api/attachments/project/${id}`).subscribe({
+        this.attachmentsLoading = true;
+        this.attachmentService.findByProject(id).subscribe({
           next: attachments => {
             this.attachments = attachments.map(a => ({
+              id: a.id,
               name: a.name,
               size: a.size,
               fileContentType: a.fileContentType,
-              base64: a.file, // ensure backend returns the Base64
+              base64: a.file,
             }));
+            this.attachmentsLoading = false;
+            this.previewMerge();
           },
-          error: err => console.error('❌ Failed to load attachments', err),
+          error: err => {
+            console.error('❌ Failed to load attachments', err);
+            this.attachmentsLoading = false;
+          },
         });
+        this.attachmentsLoading = false;
+        this.previewMerge();
       },
       error: err => console.error('❌ Failed to load project', err),
     });
   }
 
-  /** This is the function to save a project  **/
+  /** Manual save (used by Save button) **/
   saveProject(): void {
     if (!this.projectId) return;
     this.saving = true;
@@ -269,55 +275,52 @@ export class MailDashboardComponent implements OnInit {
       spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
     };
 
-    // Update project first
-    this.projectService.update(updated).subscribe({
-      next: proj => {
-        this.project = proj;
+    const newAttachmentDTOs = this.attachments
+      .filter(a => !a.id)
+      .map(a => ({
+        file: a.base64,
+        fileContentType: a.fileContentType,
+        name: a.name,
+        size: a.size,
+      }));
 
-        //  Then upload attachments, if any
-        if (this.attachments.length > 0) {
-          const attachmentDTOs = this.attachments.map(a => ({
-            file: a.base64,
-            fileContentType: a.fileContentType,
-            name: a.name,
-            size: a.size,
-          }));
-
-          this.http.post(`/api/attachments/project/${this.projectId}`, attachmentDTOs).subscribe({
-            next: () => {
-              this.saving = false;
-              this.saveSuccess = true;
-              setTimeout(() => (this.saveSuccess = false), 3000);
-            },
-            error: err => {
-              console.error('❌ Failed to upload attachments', err);
-              this.saving = false;
-            },
-          });
-        } else {
+    this.projectService
+      .update(updated)
+      .pipe(
+        switchMap(() => {
+          if (this.deletedAttachmentIds.length > 0) {
+            const deletes = this.deletedAttachmentIds.map(id => this.attachmentService.deleteById(id));
+            return forkJoin(deletes);
+          }
+          return of(null);
+        }),
+        switchMap(() => {
+          if (newAttachmentDTOs.length > 0) {
+            return this.attachmentService.saveForProject(this.projectId!, newAttachmentDTOs);
+          }
+          return of(null);
+        }),
+      )
+      .subscribe({
+        next: () => {
           this.saving = false;
           this.saveSuccess = true;
+          this.deletedAttachmentIds = [];
           setTimeout(() => (this.saveSuccess = false), 3000);
-        }
-      },
-      error: err => {
-        console.error('❌ Save failed', err);
-        this.saving = false;
-      },
-    });
+        },
+        error: err => {
+          console.error('❌ Save failed', err);
+          this.saving = false;
+        },
+      });
   }
 
-  /** This is the button to send a project **/
-  sendProject(): void {
-    if (!this.projectId || !this.mergeFile) {
-      this.mergeErr.set(true);
-      return;
-    }
+  /** Helper used internally to wait for save before sending **/
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  private saveProjectAndReturnObservable() {
+    if (!this.projectId) return of(void 0);
 
-    this.mergeSending.set(true);
-    this.mergeErr.set(false);
-
-    const pendingProject: Project = {
+    const updated: Project = {
       ...(this.project ?? {}),
       id: this.projectId,
       name: this.projectName,
@@ -331,10 +334,53 @@ export class MailDashboardComponent implements OnInit {
       spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
     };
 
-    // Save the project first
-    this.projectService.update(pendingProject).subscribe({
+    const newAttachmentDTOs = this.attachments
+      .filter(a => !a.id)
+      .map(a => ({
+        file: a.base64,
+        fileContentType: a.fileContentType,
+        name: a.name,
+        size: a.size,
+      }));
+
+    return this.projectService.update(updated).pipe(
+      switchMap(() => {
+        if (this.deletedAttachmentIds.length > 0) {
+          const deletes = this.deletedAttachmentIds.map(id => this.attachmentService.deleteById(id));
+          return forkJoin(deletes);
+        }
+        return of(null);
+      }),
+      switchMap(() => {
+        if (newAttachmentDTOs.length > 0) {
+          return this.attachmentService.saveForProject(this.projectId!, newAttachmentDTOs);
+        }
+        return of(null);
+      }),
+      tap(() => {
+        this.deletedAttachmentIds = [];
+      }),
+      switchMap(() => of(void 0)),
+    );
+  }
+
+  /** Save first, then send **/
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  sendProject(): void {
+    if (!this.projectId || !this.mergeFile) {
+      this.mergeErr.set(true);
+      return;
+    }
+    if (this.attachmentsLoading) {
+      alert('Attachments are still loading, please wait a moment.');
+      return;
+    }
+
+    this.mergeSending.set(true);
+    this.mergeErr.set(false);
+
+    this.saveProjectAndReturnObservable().subscribe({
       next: () => {
-        // Then trigger backend to send with all fields
         const payload = {
           subjectTemplate: this.mergeSubjectTemplate,
           bodyTemplate: this.mergeBodyTemplate,
@@ -364,14 +410,14 @@ export class MailDashboardComponent implements OnInit {
         });
       },
       error: err => {
-        console.error('❌ Update before send failed', err);
+        console.error('❌ Save-before-send failed', err);
         this.mergeSending.set(false);
         this.mergeErr.set(true);
       },
     });
   }
 
-  /** This is used to preview the merge in the right hand panel **/
+  // eslint-disable-next-line @typescript-eslint/member-ordering
   previewMerge(): void {
     if (!this.mergeFile) {
       this.previewEmails = [];
@@ -401,15 +447,12 @@ export class MailDashboardComponent implements OnInit {
           return out;
         };
 
-        const to = replaceTokens(this.toField) || '(missing To)';
-        const subject = replaceTokens(this.mergeSubjectTemplate);
-        const body = replaceTokens(this.mergeBodyTemplate);
-        const cc = replaceTokens(this.ccField);
-        const bcc = replaceTokens(this.bccField);
-
         return {
-          to,
-          body: `Subject: ${subject}\nCC: ${cc}\nBCC: ${bcc}\n\n${body}`,
+          to: replaceTokens(this.toField) || '(missing To)',
+          cc: replaceTokens(this.ccField),
+          bcc: replaceTokens(this.bccField),
+          subject: replaceTokens(this.mergeSubjectTemplate),
+          body: replaceTokens(this.mergeBodyTemplate),
           attachments: this.attachments,
         };
       });
@@ -417,29 +460,23 @@ export class MailDashboardComponent implements OnInit {
 
     reader.readAsArrayBuffer(this.mergeFile);
   }
-  /** This is used to turn on and off the preview **/
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
   togglePreview(): void {
-    if (this.previewVisible) {
-      // already open? just regenerate so users see latest changes
-      this.previewMerge();
-    } else {
-      // switch from How To → Preview
+    if (this.previewVisible) this.previewMerge();
+    else {
       this.previewVisible = true;
       this.howToVisible = false;
       this.previewMerge();
     }
   }
 
-  /** This is to turn on and off the how to page **/
+  // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleHowTo(): void {
     this.howToVisible = !this.howToVisible;
-    if (this.howToVisible) {
-      // when How To is open, hide the preview pane
-      this.previewVisible = false;
-    }
+    if (this.howToVisible) this.previewVisible = false;
   }
 
-  /** Helper to parse spreadsheet headers from a File object - used when getting headers for drag and drop */
   private parseSpreadsheetForHeaders(file: File): void {
     const reader = new FileReader();
     reader.onload = e => {
@@ -458,5 +495,43 @@ export class MailDashboardComponent implements OnInit {
       this.previewMerge();
     };
     reader.readAsArrayBuffer(file);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  downloadSpreadsheet(event: Event): void {
+    event.preventDefault();
+    if (!this.spreadsheetBase64 || !this.mergeFile) return;
+
+    const blob = this.base64ToBlob(this.spreadsheetBase64, this.spreadsheetFileContentType ?? 'application/octet-stream');
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = this.mergeFile.name;
+    a.click();
+    window.URL.revokeObjectURL(url);
+  }
+
+  private base64ToBlob(base64: string, contentType: string): Blob {
+    const byteCharacters = atob(base64);
+    const byteArrays = [];
+    for (let offset = 0; offset < byteCharacters.length; offset += 512) {
+      const slice = byteCharacters.slice(offset, offset + 512);
+      const byteNumbers = new Array(slice.length);
+      for (let i = 0; i < slice.length; i++) byteNumbers[i] = slice.charCodeAt(i);
+      byteArrays.push(new Uint8Array(byteNumbers));
+    }
+    return new Blob(byteArrays, { type: contentType });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  downloadAttachment(a: { name: string; base64: string; fileContentType: string; size: number }, event: Event): void {
+    event.preventDefault();
+    const blob = this.base64ToBlob(a.base64, a.fileContentType || 'application/octet-stream');
+    const url = window.URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = a.name;
+    anchor.click();
+    window.URL.revokeObjectURL(url);
   }
 }

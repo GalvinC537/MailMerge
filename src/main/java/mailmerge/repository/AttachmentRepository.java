@@ -13,6 +13,7 @@ import java.util.List;
 @Repository
 public interface AttachmentRepository extends JpaRepository<Attachment, Long>, JpaSpecificationExecutor<Attachment> {
 
-    List<Attachment> findByProjectId(Long projectId);
+    // Corrected to use the relationship name
+    List<Attachment> findByProject_Id(Long projectId);
 
 }
