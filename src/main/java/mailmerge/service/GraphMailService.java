@@ -1,5 +1,6 @@
 package mailmerge.service;
 
+import mailmerge.service.dto.MailProgressEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,15 +15,17 @@ public class GraphMailService {
 
     private static final Logger log = LoggerFactory.getLogger(GraphMailService.class);
     private final WebClient graphWebClient;
+    private final MailProgressService progressService;
 
-    public GraphMailService(WebClient graphWebClient) {
+    public GraphMailService(WebClient graphWebClient, MailProgressService progressService) {
         this.graphWebClient = graphWebClient;
+        this.progressService = progressService;
     }
 
     /**
      * Sends a message via Microsoft Graph (BLOCKING, STABLE VERSION)
      */
-    public void sendMail(
+    public boolean sendMail(
         String to,
         String cc,
         String bcc,
@@ -31,6 +34,18 @@ public class GraphMailService {
         List<AttachmentDTO> attachments
     ) {
         try {
+
+            // 🔵 Emit START/SENDING event BEFORE calling Graph API
+            progressService.sendProgress(
+                new MailProgressEvent(
+                    to,
+                    false, // not done yet
+                    -1,    // MailMergeService controls the counter
+                    -1,
+                    "Sending..."
+                )
+            );
+
             log.info("📧 Sending email to={} cc={} bcc={} subject={} attachments={}",
                 to, cc, bcc, subject, attachments != null ? attachments.size() : 0);
 
@@ -55,7 +70,6 @@ public class GraphMailService {
                 }
             }
 
-            // Build the Graph message payload
             Map<String, Object> message = new LinkedHashMap<>();
             message.put("subject", subject != null ? subject : "(no subject)");
             message.put("body", Map.of("contentType", "HTML", "content", body != null ? body : ""));
@@ -69,19 +83,44 @@ public class GraphMailService {
                 "saveToSentItems", true
             );
 
-            // ✅ **BLOCKING send (this is the stable version that worked before)**
+            // MS GRAPH SEND
             graphWebClient.post()
                 .uri("/me/sendMail")
                 .bodyValue(payload)
                 .retrieve()
                 .toBodilessEntity()
-                .block(); // THIS was working fine
+                .block();
 
             log.info("✅ Email sent successfully to {}", to);
 
+            // 🟢 Emit SUCCESS progress event
+            progressService.sendProgress(
+                new MailProgressEvent(
+                    to,
+                    true,   // success
+                    -1,
+                    -1,
+                    "Sent successfully"
+                )
+            );
+
+            return true;
+
         } catch (Exception e) {
             log.error("❌ Failed to send email: {}", e.getMessage());
-            // swallow error so mail-merge continues
+
+            // 🔴 Emit FAILURE event
+            progressService.sendProgress(
+                new MailProgressEvent(
+                    to,
+                    false,
+                    -1,
+                    -1,
+                    "FAILED: " + e.getMessage()
+                )
+            );
+
+            return false;
         }
     }
 
