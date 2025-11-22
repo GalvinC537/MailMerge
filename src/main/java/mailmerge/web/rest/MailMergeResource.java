@@ -25,21 +25,6 @@ public class MailMergeResource {
     }
 
     /**
-     *  OLD endpoint: supports multipart form-data upload
-     * (kept for backward compatibility)
-     */
-    @PostMapping("/send")
-    public ResponseEntity<Void> sendMailMergeLegacy(
-            @RequestPart("file") MultipartFile file,
-            @RequestPart("subjectTemplate") String subjectTemplate,
-            @RequestPart("bodyTemplate") String bodyTemplate
-    ) throws Exception {
-        log.debug("REST request (legacy) to send mail merge using file: {}", file.getOriginalFilename());
-        mailMergeService.sendMailMerge(file, subjectTemplate, bodyTemplate);
-        return ResponseEntity.ok().build();
-    }
-
-    /**
      *  NEW endpoint: handles JSON payload with to/cc/bcc/attachments
      *
      * Called from sendMailMergeWithMeta() in project.service.ts

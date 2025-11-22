@@ -176,6 +176,27 @@
                     <div *ngIf="mergeErr()" class="text-danger fw-semibold">❌ Mail merge failed.</div>
                 </div>
             </form>
+
+          <div *ngIf="sendingInProgress || sendingFinished" class="progress-wrapper mt-4">
+            <div class="progress status-progress">
+              <div
+                class="progress-bar"
+                [ngClass]="{
+        'bg-progress': sendingProgress < sendingTotal,
+        'bg-success-final': sendingFinished
+      }"
+                role="progressbar"
+                [style.width.%]="sendingTotal > 0 ? (sendingProgress / sendingTotal) * 100 : 0"
+              >
+                {{ sendingProgress }} / {{ sendingTotal }}
+              </div>
+            </div>
+
+            <!-- Live log lines -->
+            <div class="progress-log mt-3">
+              <div *ngFor="let log of progressLogs">{{ log }}</div>
+            </div>
+          </div>
         </div>
 
         <!-- RIGHT PANEL -->

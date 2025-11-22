@@ -49,6 +49,12 @@ export class MailDashboardComponent implements OnInit {
   sendSuccess = false;
   attachmentsLoading = false;
 
+  sendingProgress = 0;
+  sendingTotal = 0;
+  sendingInProgress = false;
+  progressLogs: string[] = [];
+  sendingFinished = false;
+
   spreadsheetHeaders: string[] = [];
   previewEmails: {
     to: string;
@@ -61,10 +67,6 @@ export class MailDashboardComponent implements OnInit {
   previewVisible = true;
   howToVisible = false;
 
-  sendingProgress = 0;
-  sendingTotal = 0;
-  sendingInProgress = false;
-
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
   private readonly loginService = inject(LoginService);
@@ -76,6 +78,7 @@ export class MailDashboardComponent implements OnInit {
 
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => this.account.set(account));
+    this.listenToMailProgress();
 
     this.route.params.subscribe(params => {
       const idParam = params['id'];
@@ -379,6 +382,12 @@ export class MailDashboardComponent implements OnInit {
     this.mergeSending.set(true);
     this.mergeErr.set(false);
 
+    this.sendingProgress = 0;
+    this.sendingTotal = 0;
+    this.sendingInProgress = true;
+    this.progressLogs = [];
+    this.sendingFinished = false;
+
     this.saveProjectAndReturnObservable().subscribe({
       next: () => {
         const payload = {
@@ -533,5 +542,49 @@ export class MailDashboardComponent implements OnInit {
     anchor.download = a.name;
     anchor.click();
     window.URL.revokeObjectURL(url);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  listenToMailProgress(): void {
+    const eventSource = new EventSource('/api/mail-progress/stream');
+
+    // eslint-disable-next-line @typescript-eslint/no-empty-function
+    eventSource.onopen = () => {};
+
+    // Listen for our named event "mail-progress"
+    eventSource.addEventListener('mail-progress', (event: MessageEvent) => {
+      const data = JSON.parse(event.data);
+
+      // Update counts if present
+      if (typeof data.totalCount === 'number' && data.totalCount >= 0) {
+        this.sendingTotal = data.totalCount;
+      }
+      if (typeof data.sentCount === 'number' && data.sentCount >= 0) {
+        this.sendingProgress = data.sentCount;
+      }
+
+      this.sendingInProgress = this.sendingTotal > 0 && this.sendingProgress < this.sendingTotal;
+
+      // Log lines for the list
+      if (data.email && data.message) {
+        this.progressLogs.push(`${data.email} — ${data.message}`);
+      }
+
+      // When finished
+      // Detect completion
+      if (this.sendingTotal > 0 && this.sendingProgress >= this.sendingTotal) {
+        this.sendingInProgress = false;
+        this.sendingFinished = true;
+
+        // Hide after 5 seconds
+        setTimeout(() => {
+          this.sendingFinished = false;
+        }, 5000);
+      }
+    });
+
+    eventSource.onerror = err => {
+      console.error('SSE error', err);
+    };
   }
 }
