@@ -132,7 +132,7 @@ jobs:
             exit 1
           fi
 
-          printf "CI_REGISTRY_USER=%s\nCI_REGISTRY_PASSWORD=%s\nCI_REGISTRY_IMAGE=%s\nCI_COMMIT_TAG=%s\nCI_REGISTRY=%s\nACME=%s\nDEVURL=%s\nURL=%s\nDEPLOY_IP=%s\nEMAIL=%s\nAZURE_CLIENT_ID=%s\nAZURE_CLIENT_SECRET=%s\nAZURE_TENANT_ID=%s\n" \
+          printf "CI_REGISTRY_USER=%s\nCI_REGISTRY_PASSWORD=%s\nCI_REGISTRY_IMAGE=%s\nCI_COMMIT_TAG=%s\nCI_REGISTRY=%s\nACME=%s\nDEVURL=%s\nURL=%s\nDEPLOY_IP=%s\nEMAIL=%s\nAZURE_CLIENT_ID=%s\nAZURE_CLIENT_SECRET=%s\nAZURE_TENANT_ID=%s\nGROQ_API_KEY=%s\n" \
             "${{ env.CI_REGISTRY_USER }}" \
             "${{ env.CI_REGISTRY_PASSWORD }}" \
             "ghcr.io/${OWNER_LC}/${REPO_LC}" \
