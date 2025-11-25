@@ -226,3 +226,5 @@ jhipster:
       audience:
         - account
         - api://default
+groq:
+  api-key: ${GROQ_API_KEY}
