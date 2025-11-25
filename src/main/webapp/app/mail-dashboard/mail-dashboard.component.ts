@@ -12,6 +12,7 @@ import { Account } from 'app/core/auth/account.model';
 import { DomSanitizer } from '@angular/platform-browser';
 import { AttachmentService } from 'app/project/attachment.service';
 import { forkJoin, of, switchMap, tap } from 'rxjs';
+import { AiRewriteService } from '../services/ai-rewrite.service';
 
 @Component({
   standalone: true,
@@ -33,6 +34,15 @@ export class MailDashboardComponent implements OnInit {
 
   spreadsheetBase64: string | null = null;
   spreadsheetFileContentType: string | null = null;
+  spreadsheetVisible = false;
+  spreadsheetTable: string[][] = [];
+  spreadsheetPreviewVisible = false;
+
+  isRewriting = false;
+  customTone = ''; // user-defined style/tone
+  aiVisible = false;
+  aiRewrittenText = '';
+  aiSelectedTone: 'professional' | 'friendly' | 'custom' | null = null;
 
   toField = '';
   ccField = '';
@@ -75,6 +85,7 @@ export class MailDashboardComponent implements OnInit {
   private readonly http = inject(HttpClient);
   private readonly sanitizer = inject(DomSanitizer);
   private readonly attachmentService = inject(AttachmentService);
+  private readonly aiRewriteService = inject(AiRewriteService);
 
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => this.account.set(account));
@@ -157,15 +168,25 @@ export class MailDashboardComponent implements OnInit {
 
       const data = new Uint8Array(result as ArrayBuffer);
       const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.SheetNames[0];
-      const sheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheet], { header: 1 });
+
+      const sheetName = workbook.SheetNames[0];
+      const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
+
       if (Array.isArray(sheetData) && sheetData.length > 0) {
-        this.spreadsheetHeaders = (sheetData[0] as unknown as string[]).filter(h => !!h && h.trim() !== '');
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        this.spreadsheetHeaders = sheetData[0].filter(h => !!h && h.trim() !== '');
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-expect-error
+        this.spreadsheetTable = sheetData; // ✅ store entire sheet for preview
       }
+
       this.previewMerge();
     };
+
     reader.readAsArrayBuffer(this.mergeFile);
 
+    // Save base64 for backend
     const dataUrlReader = new FileReader();
     dataUrlReader.onload = e => {
       const dataUrl = (e.target as FileReader).result as string;
@@ -409,6 +430,30 @@ export class MailDashboardComponent implements OnInit {
           next: () => {
             this.mergeSending.set(false);
             this.sendSuccess = true;
+            if (this.projectId) {
+              const updatedProject: Project = {
+                ...(this.project ?? {}), // keep all existing values
+                id: this.projectId,
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                name: this.projectName ?? '', // ensure not undefined
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                header: this.mergeSubjectTemplate ?? '',
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                content: this.mergeBodyTemplate ?? '',
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                toField: this.toField ?? '',
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                ccField: this.ccField ?? '',
+                // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+                bccField: this.bccField ?? '',
+                spreadsheetLink: this.spreadsheetBase64 ?? null,
+                spreadsheetFileContentType: this.spreadsheetFileContentType ?? null,
+                status: 'SENT',
+                sentAt: new Date().toISOString(), // ✅ timestamp of send
+              };
+
+              this.projectService.update(updatedProject).subscribe();
+            }
             setTimeout(() => (this.sendSuccess = false), 3000);
           },
           error: err => {
@@ -476,6 +521,8 @@ export class MailDashboardComponent implements OnInit {
     else {
       this.previewVisible = true;
       this.howToVisible = false;
+      this.spreadsheetPreviewVisible = false;
+      this.aiVisible = false;
       this.previewMerge();
     }
   }
@@ -483,6 +530,8 @@ export class MailDashboardComponent implements OnInit {
   // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleHowTo(): void {
     this.howToVisible = !this.howToVisible;
+    this.spreadsheetPreviewVisible = false;
+    this.aiVisible = false;
     if (this.howToVisible) this.previewVisible = false;
   }
 
@@ -586,5 +635,61 @@ export class MailDashboardComponent implements OnInit {
     eventSource.onerror = err => {
       console.error('SSE error', err);
     };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  rewriteEmailBody(tone: 'professional' | 'friendly' | 'custom'): void {
+    if (!this.mergeBodyTemplate) return;
+
+    const selectedTone = tone === 'custom' ? this.customTone : tone;
+    if (!selectedTone.trim()) return;
+
+    this.isRewriting = true;
+    this.aiSelectedTone = tone;
+    this.aiRewrittenText = '';
+
+    this.aiRewriteService.rewrite(this.mergeBodyTemplate, selectedTone).subscribe({
+      next: res => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        this.aiRewrittenText = res.rewrittenText ?? '';
+        this.isRewriting = false;
+      },
+      error: () => {
+        alert('AI rewriting failed. Try again.');
+        this.isRewriting = false;
+      },
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  applyRewrittenEmail(): void {
+    if (!this.aiRewrittenText) return;
+
+    // Update main editor text
+    this.mergeBodyTemplate = this.aiRewrittenText;
+
+    // Refresh preview content
+    this.previewMerge();
+
+    // Switch UI panels
+    this.previewVisible = true;
+    this.howToVisible = false;
+    this.aiVisible = false;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleAI(): void {
+    this.aiVisible = !this.aiVisible;
+    this.previewVisible = false;
+    this.howToVisible = false;
+    this.spreadsheetPreviewVisible = false;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleSpreadsheetPreview(): void {
+    this.spreadsheetPreviewVisible = !this.spreadsheetPreviewVisible;
+    this.previewVisible = false;
+    this.howToVisible = false;
+    this.aiVisible = false;
   }
 }

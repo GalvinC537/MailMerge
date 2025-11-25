@@ -90,3 +90,7 @@ management:
   health:
     mail:
       enabled: false
+      
+
+groq:
+  api-key: dummy-test-key

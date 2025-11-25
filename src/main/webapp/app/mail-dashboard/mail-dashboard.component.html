@@ -212,6 +212,24 @@
                 </button>
 
                 <button
+                  type="button"
+                  class="btn btn-outline-primary howto-btn"
+                  (click)="toggleSpreadsheetPreview()"
+                  [class.active]="spreadsheetPreviewVisible"
+                >
+                  📊 Spreadsheet
+                </button>
+
+                <button
+                  type="button"
+                  class="btn btn-outline-primary ai-btn"
+                  [class.active]="aiVisible"
+                  (click)="toggleAI()"
+                >
+                  AI Improvement
+                </button>
+
+                <button
                         type="button"
                         class="btn btn-outline-primary preview-btn"
                         [class.active]="previewVisible"
@@ -229,6 +247,80 @@
                     3️⃣ Click <strong>Preview</strong> to see personalized emails.<br /><br />
                     4️⃣ Click <strong>Send Emails</strong> to send them all.
                 </p>
+            </div>
+
+            <div *ngIf="spreadsheetPreviewVisible" class="excel-preview mt-3 text-start">
+              <h4>Spreadsheet Preview</h4>
+
+              <table class="table table-bordered table-sm mt-2">
+                <thead>
+                <tr>
+                  <th *ngFor="let h of spreadsheetTable[0]">{{ h }}</th>
+                </tr>
+                </thead>
+                <tbody>
+                <tr *ngFor="let row of spreadsheetTable.slice(1)">
+                  <td *ngFor="let cell of row">{{ cell }}</td>
+                </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <!-- AI IMPROVEMENT PANEL -->
+            <div *ngIf="aiVisible" class="ai-panel text-start">
+
+              <h4 class="mb-3">Select Your Tone</h4>
+
+              <div class="d-flex gap-3 mb-3">
+                <button
+                  class="btn btn-info"
+                  (click)="rewriteEmailBody('professional')"
+                  [disabled]="isRewriting || !mergeBodyTemplate"
+                >
+                  ✨ Professional
+                </button>
+
+                <button
+                  class="btn btn-info"
+                  (click)="rewriteEmailBody('friendly')"
+                  [disabled]="isRewriting || !mergeBodyTemplate"
+                >
+                  🙂 Friendly
+                </button>
+
+                <button
+                  class="btn btn-info"
+                  (click)="rewriteEmailBody('custom')"
+                  [disabled]="isRewriting || !mergeBodyTemplate || !customTone"
+                >
+                  🎯 Custom
+                </button>
+              </div>
+
+              <!-- Custom tone input -->
+              <input
+                type="text"
+                class="form-control mb-3"
+                [(ngModel)]="customTone"
+                name="customTone"
+                placeholder="e.g. more concise, persuasive, motivational..."
+                style="max-width: 350px;"
+              />
+
+              <!-- Loader -->
+              <div *ngIf="isRewriting" class="text-muted fst-italic">
+                <span class="spinner-border spinner-border-sm"></span> rewriting...
+              </div>
+
+              <!-- AI Preview -->
+              <div *ngIf="aiRewrittenText && !isRewriting" class="ai-preview-box mt-3">
+                <h5>Suggested Rewrite</h5>
+                <pre>{{ aiRewrittenText }}</pre>
+
+                <button class="btn btn-success mt-2" (click)="applyRewrittenEmail()">
+                  ✅ Use This Email
+                </button>
+              </div>
             </div>
 
             <!-- Email Preview -->
