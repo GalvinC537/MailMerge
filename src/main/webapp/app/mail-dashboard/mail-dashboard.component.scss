@@ -356,6 +356,32 @@ $danger-red: #dc3545;
     background: white;
     font-size: 0.85rem;
   }
+
+  .merge-editor:empty::before {
+    content: attr(placeholder);
+    color: #999;
+  }
+
+  .merge-editor:empty {
+    min-height: 1.2em;
+  }
+
+  .merge-editor br {
+    display: none;
+  }
+
+  .merge-field {
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: grab;
+    user-select: none;
+    display: inline-block;
+    color: #fff;
+  }
+
+  .merge-field:hover {
+    opacity: 0.85;
+  }
 }
 
 
