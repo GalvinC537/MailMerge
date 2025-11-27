@@ -32,6 +32,8 @@ export class MailDashboardComponent implements OnInit {
   mergeFile: File | null = null;
   mergeFileName: string | null = null;
 
+  tokenColors: Record<string, string> = {};
+
   spreadsheetBase64: string | null = null;
   spreadsheetFileContentType: string | null = null;
   spreadsheetVisible = false;
@@ -98,6 +100,73 @@ export class MailDashboardComponent implements OnInit {
         this.loadProject(this.projectId);
       }
     });
+
+    document.addEventListener('keydown', e => {
+      if (e.key !== 'Backspace') return;
+
+      const sel = window.getSelection();
+      if (!sel?.anchorNode) return;
+
+      const anchor = sel.anchorNode;
+
+      // 🔹 Find the merge editor even when it's completely empty
+      const container = anchor instanceof Element ? anchor.closest('.merge-editor') : anchor.parentElement?.closest('.merge-editor');
+
+      if (!container) return;
+
+      // 🔹 If the editor is visually empty, block backspace completely
+      const plain = (container as HTMLElement).innerText.trim();
+
+      if (plain === '') {
+        e.preventDefault();
+        container.innerHTML = ''; // keep it clean
+        return;
+      }
+
+      // 🔹 Token delete behaviour (only if we're actually on a token)
+      const token = anchor instanceof Element ? anchor.closest('.merge-token') : anchor.parentElement?.closest('.merge-token');
+
+      if (!token) return;
+
+      e.preventDefault();
+      token.remove();
+
+      const fieldContainer = token.closest('[id]');
+      if (!fieldContainer) return;
+
+      const id = (fieldContainer as HTMLElement).id;
+
+      let field: 'body' | 'subject' | 'to' | 'cc' | 'bcc' | null = null;
+
+      if (id === 'mergeBody') field = 'body';
+      else if (id === 'mergeSubject') field = 'subject';
+      else if (id === 'toField') field = 'to';
+      else if (id === 'ccField') field = 'cc';
+      else if (id === 'bccField') field = 'bcc';
+
+      if (field) {
+        this.onEditorInput(field);
+        setTimeout(() => this.renderTokens(field));
+      }
+    });
+
+    // ✅ only prevent cursor going INSIDE a token — not next to it
+    document.addEventListener('mouseup', () => {
+      const sel = window.getSelection();
+      if (!sel?.anchorNode) return;
+
+      const token = sel.anchorNode.parentElement?.closest('.merge-token');
+
+      // Only fix if cursor is INSIDE the text of the token
+      if (token && sel.anchorNode === token.firstChild) {
+        const range = document.createRange();
+        range.setStartAfter(token);
+        range.collapse(true);
+
+        sel.removeAllRanges();
+        sel.addRange(range);
+      }
+    });
   }
 
   goBack(): void {
@@ -117,36 +186,43 @@ export class MailDashboardComponent implements OnInit {
   onDrop(event: DragEvent, field: 'to' | 'cc' | 'bcc' | 'subject' | 'body'): void {
     event.preventDefault();
     const text = event.dataTransfer?.getData('text/plain') ?? '';
-    const elementIdMap = {
-      to: 'toField',
-      cc: 'ccField',
-      bcc: 'bccField',
-      subject: 'mergeSubject',
-      body: 'mergeBody',
-    };
-    const el = document.getElementById(elementIdMap[field]) as HTMLInputElement | HTMLTextAreaElement | null;
-    if (!el) return;
-    const start = el.selectionStart ?? 0;
-    const end = el.selectionEnd ?? 0;
-    const value = el.value;
-    el.value = value.slice(0, start) + text + value.slice(end);
 
-    switch (field) {
-      case 'to':
-        this.toField = el.value;
-        break;
-      case 'cc':
-        this.ccField = el.value;
-        break;
-      case 'bcc':
-        this.bccField = el.value;
-        break;
-      case 'subject':
-        this.mergeSubjectTemplate = el.value;
-        break;
-      case 'body':
-        this.mergeBodyTemplate = el.value;
-        break;
+    // ✅ If it's body or subject → contenteditable logic
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (field === 'body' || field === 'subject' || field === 'to' || field === 'cc' || field === 'bcc') {
+      const el = document.getElementById(this.getElementId(field));
+      if (!el) return;
+
+      el.focus();
+
+      const sel = window.getSelection();
+      if (!sel?.rangeCount) return;
+
+      const range = sel.getRangeAt(0);
+      range.deleteContents();
+
+      // Insert raw token text (we'll convert to blocks after)
+      range.insertNode(document.createTextNode(text));
+
+      // Move caret after insertion
+      // ✅ create a space after token so cursor has somewhere to go
+      const space = document.createTextNode(' ');
+      range.insertNode(space);
+
+      // ✅ move caret after the space
+      range.setStartAfter(space);
+      range.collapse(true);
+
+      sel.removeAllRanges();
+      sel.addRange(range);
+
+      // Update model
+      this.onEditorInput(field);
+
+      // Convert into block visually
+      setTimeout(() => this.renderTokens(field));
+
+      return;
     }
 
     this.previewMerge();
@@ -267,6 +343,9 @@ export class MailDashboardComponent implements OnInit {
             }));
             this.attachmentsLoading = false;
             this.previewMerge();
+            setTimeout(() => {
+              ['body', 'subject', 'to', 'cc', 'bcc'].forEach(f => this.renderTokens(f as any));
+            });
           },
           error: err => {
             console.error('❌ Failed to load attachments', err);
@@ -413,7 +492,7 @@ export class MailDashboardComponent implements OnInit {
       next: () => {
         const payload = {
           subjectTemplate: this.mergeSubjectTemplate,
-          bodyTemplate: this.mergeBodyTemplate,
+          bodyTemplate: this.mergeBodyTemplate.replace(/\n/g, '<br>'),
           toTemplate: this.toField,
           ccTemplate: this.ccField,
           bccTemplate: this.bccField,
@@ -665,13 +744,15 @@ export class MailDashboardComponent implements OnInit {
   applyRewrittenEmail(): void {
     if (!this.aiRewrittenText) return;
 
-    // Update main editor text
     this.mergeBodyTemplate = this.aiRewrittenText;
 
-    // Refresh preview content
+    // ✅ update the editor UI
+    setTimeout(() => this.renderTokens('body'));
+
+    // ✅ refresh preview
     this.previewMerge();
 
-    // Switch UI panels
+    // ✅ close UI panels
     this.previewVisible = true;
     this.howToVisible = false;
     this.aiVisible = false;
@@ -691,5 +772,114 @@ export class MailDashboardComponent implements OnInit {
     this.previewVisible = false;
     this.howToVisible = false;
     this.aiVisible = false;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  onEditorInput(field: 'body' | 'subject' | 'to' | 'cc' | 'bcc'): void {
+    const el = document.getElementById(this.getElementId(field));
+    if (!el) return;
+
+    let html = el.innerHTML;
+
+    // ✅ convert merge tokens back to {{field}}
+    html = html.replace(/<span[^>]*class="merge-token"[^>]*data-field="([^"]+)"[^>]*>.*?<\/span>/gi, '{{$1}}');
+
+    // ✅ convert <br> to newline
+    html = html.replace(/<br\s*\/?>/gi, '\n');
+
+    // ✅ convert block elements into newlines
+    html = html.replace(/<\/div>|<\/p>/gi, '\n');
+
+    // ✅ remove opening tags safely
+    html = html.replace(/<div[^>]*>|<p[^>]*>/gi, '');
+
+    // ✅ convert &nbsp; to spaces
+    html = html.replace(/&nbsp;/g, ' ');
+
+    // ✅ DO NOT remove all tags blindly (this was your problem before)
+
+    const raw = html;
+
+    if (field === 'body') this.mergeBodyTemplate = raw;
+    if (field === 'subject') this.mergeSubjectTemplate = raw;
+    if (field === 'to') this.toField = raw;
+    if (field === 'cc') this.ccField = raw;
+    if (field === 'bcc') this.bccField = raw;
+
+    this.previewMerge();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  renderTokens(field: 'body' | 'subject' | 'to' | 'cc' | 'bcc'): void {
+    const el = document.getElementById(this.getElementId(field));
+    if (!el) return;
+
+    let text = '';
+
+    if (field === 'body') text = this.mergeBodyTemplate;
+    else if (field === 'subject') text = this.mergeSubjectTemplate;
+    else if (field === 'to') text = this.toField;
+    else if (field === 'cc') text = this.ccField;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    else if (field === 'bcc') text = this.bccField;
+
+    // ✅ escape HTML
+    let safe = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+    // ✅ restore visual line breaks in editor
+    safe = safe.replace(/\n/g, '<br>');
+
+    el.innerHTML = safe.replace(
+      /{{\s*([^}]+)\s*}}/g,
+      (_, key) =>
+        `<span class="merge-token"
+         data-field="${key}"
+         contenteditable="false"
+         style="background:${this.getColorForField(key)}">${key}</span>`,
+    );
+
+    // ✅ ensure there is always a text node after tokens
+    // ✅ ensure there's a normal space to type after
+    if (!el.lastChild || el.lastChild.nodeType !== Node.TEXT_NODE) {
+      el.appendChild(document.createTextNode(' ')); // real space
+    }
+
+    // ✅ keep cursor position
+    // ✅ keep caret ONLY if user is in this field
+    if (document.activeElement === el) {
+      this.placeCaretAtEnd(el);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  getColorForField(key: string): string {
+    key = key.trim();
+
+    if (!this.tokenColors[key]) {
+      this.tokenColors[key] = `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`;
+    }
+    return this.tokenColors[key];
+  }
+
+  private getElementId(field: 'body' | 'subject' | 'to' | 'cc' | 'bcc'): string {
+    return field === 'body'
+      ? 'mergeBody'
+      : field === 'subject'
+        ? 'mergeSubject'
+        : field === 'to'
+          ? 'toField'
+          : field === 'cc'
+            ? 'ccField'
+            : 'bccField';
+  }
+
+  private placeCaretAtEnd(el: HTMLElement): void {
+    const range = document.createRange();
+    range.selectNodeContents(el);
+    range.collapse(false);
+
+    const sel = window.getSelection();
+    sel?.removeAllRanges();
+    sel?.addRange(range);
   }
 }

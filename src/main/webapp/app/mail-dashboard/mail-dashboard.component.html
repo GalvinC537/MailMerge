@@ -51,14 +51,15 @@
                 <div *ngIf="spreadsheetHeaders?.length" class="mt-3">
                     <label class="form-label">Available Merge Fields:</label>
                     <div class="d-flex flex-wrap gap-2">
-            <span
-                    *ngFor="let header of spreadsheetHeaders"
-                    class="merge-field"
-                    draggable="true"
-                    (dragstart)="onDragStart($event, header)"
-            >
-              {{ header }}
-            </span>
+                <span
+                  *ngFor="let header of spreadsheetHeaders"
+                  class="merge-field"
+                  draggable="true"
+                  (dragstart)="onDragStart($event, header)"
+                  [style.background]="getColorForField(header)"
+                >
+                {{ header }}
+                 </span>
                     </div>
                     <small class="text-muted">Drag and drop into any field below</small>
                 </div>
@@ -66,79 +67,66 @@
                 <!-- To / CC / BCC fields -->
                 <div class="mb-3">
                     <label for="toField" class="form-label">To</label>
-                    <textarea
-                            id="toField"
-                            class="form-control"
-                            rows="2"
-                            [(ngModel)]="toField"
-                            (ngModelChange)="previewMerge()"
-                            name="toField"
-                            (drop)="onDrop($event, 'to')"
-                            (dragover)="allowDrop($event)"
-                            placeholder="e.g. {{'{{email}}'}}, or multiple separated by commas"
-                    ></textarea>
+                    <div
+                      id="toField"
+                      class="form-control merge-editor"
+                      contenteditable="true"
+                      (drop)="onDrop($event, 'to')"
+                      (dragover)="allowDrop($event)"
+                      (input)="onEditorInput('to')"
+                    ></div>
                 </div>
 
                 <div class="mb-3">
                     <label for="ccField" class="form-label">CC</label>
-                    <textarea
-                            id="ccField"
-                            class="form-control"
-                            rows="2"
-                            [(ngModel)]="ccField"
-                            (ngModelChange)="previewMerge()"
-                            name="ccField"
-                            (drop)="onDrop($event, 'cc')"
-                            (dragover)="allowDrop($event)"
-                            placeholder="Optional — comma-separated"
-                    ></textarea>
+                    <div
+                      id="ccField"
+                      class="form-control merge-editor"
+                      contenteditable="true"
+                      (drop)="onDrop($event, 'cc')"
+                      (dragover)="allowDrop($event)"
+                      (input)="onEditorInput('cc')"
+                    ></div>
                 </div>
 
                 <div class="mb-3">
                     <label for="bccField" class="form-label">BCC</label>
-                    <textarea
-                            id="bccField"
-                            class="form-control"
-                            rows="2"
-                            [(ngModel)]="bccField"
-                            (ngModelChange)="previewMerge()"
-                            name="bccField"
-                            (drop)="onDrop($event, 'bcc')"
-                            (dragover)="allowDrop($event)"
-                            placeholder="Optional — comma-separated"
-                    ></textarea>
+                    <div
+                      id="bccField"
+                      class="form-control merge-editor"
+                      contenteditable="true"
+                      (drop)="onDrop($event, 'bcc')"
+                      (dragover)="allowDrop($event)"
+                      (input)="onEditorInput('bcc')"
+                    ></div>
                 </div>
 
                 <!-- Subject -->
                 <div class="mb-3">
                     <label for="mergeSubject" class="form-label">Email subject</label>
-                    <input
-                            id="mergeSubject"
-                            name="mergeSubject"
-                            class="form-control"
-                            type="text"
-                            [(ngModel)]="mergeSubjectTemplate"
-                            (ngModelChange)="previewMerge()"
-                            required
-                            (drop)="onDrop($event, 'subject')"
-                            (dragover)="allowDrop($event)"
-                    />
+                    <div
+                      id="mergeSubject"
+                      class="form-control merge-editor"
+                      contenteditable="true"
+                      (drop)="onDrop($event, 'subject')"
+                      (dragover)="allowDrop($event)"
+                      (input)="onEditorInput('subject')"
+                    ></div>
                 </div>
 
                 <!-- Body -->
                 <div class="mb-3">
-                    <label for="mergeBody" class="form-label">Email body</label>
-                    <textarea
-                            id="mergeBody"
-                            name="mergeBody"
-                            class="form-control"
-                            rows="8"
-                            [(ngModel)]="mergeBodyTemplate"
-                            (ngModelChange)="previewMerge()"
-                            required
-                            (drop)="onDrop($event, 'body')"
-                            (dragover)="allowDrop($event)"
-                    ></textarea>
+                  <label for="mergeBody" class="form-label">Email body</label>
+
+                  <div
+                    id="mergeBody"
+                    name="mergeBody"
+                    class="form-control merge-editor"
+                    contenteditable="true"
+                    (drop)="onDrop($event, 'body')"
+                    (dragover)="allowDrop($event)"
+                    (input)="onEditorInput('body')"
+                  ></div>
                 </div>
 
                 <!-- Attachments -->
@@ -337,7 +325,7 @@
                         </div>
 
                         <div class="email-body mt-2">
-                            <p>{{ email.body }}</p>
+                          <p [style.white-space]="'pre-line'">{{ email.body }}</p>
                         </div>
 
                         <!-- Attachments section -->
