@@ -234,3 +234,35 @@ angular-cli removes postcss-rtl processed inline css, processed rules must be ad
   }
 }
 /* jhipster-needle-scss-add-main JHipster will add new css style */
+
+
+/* Fix bold / italic / underline inside email preview HTML */
+.mail-dashboard .preview-section .email-body strong,
+.mail-dashboard .preview-section .email-body b {
+  font-weight: 700 !important;
+}
+
+.mail-dashboard .preview-section .email-body i,
+.mail-dashboard .preview-section .email-body em {
+  font-style: italic !important;
+}
+
+.mail-dashboard .preview-section .email-body u {
+  text-decoration: underline !important;
+}
+
+/* Fix bold / italic / underline inside AI rewrite preview */
+.mail-dashboard .ai-preview-box .ai-preview-content strong,
+.mail-dashboard .ai-preview-box .ai-preview-content b {
+  font-weight: 700 !important;
+}
+
+.mail-dashboard .ai-preview-box .ai-preview-content i,
+.mail-dashboard .ai-preview-box .ai-preview-content em {
+  font-style: italic !important;
+}
+
+.mail-dashboard .ai-preview-box .ai-preview-content u {
+  text-decoration: underline !important;
+}
+
