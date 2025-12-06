@@ -114,6 +114,21 @@
                     ></div>
                 </div>
 
+                <!-- Formatting Toolbar -->
+                <div class="btn-toolbar mb-2">
+                  <button type="button" class="btn btn-light" (mousedown)="formatFromToolbar($event, 'bold')">
+                    <b>B</b>
+                  </button>
+
+                  <button type="button" class="btn btn-light" (mousedown)="formatFromToolbar($event, 'italic')">
+                    <i>I</i>
+                  </button>
+
+                  <button type="button" class="btn btn-light" (mousedown)="formatFromToolbar($event, 'underline')">
+                    <u>U</u>
+                  </button>
+                </div>
+
                 <!-- Body -->
                 <div class="mb-3">
                   <label for="mergeBody" class="form-label">Email body</label>
@@ -296,19 +311,16 @@
               />
 
               <!-- Loader -->
-              <div *ngIf="isRewriting" class="text-muted fst-italic">
-                <span class="spinner-border spinner-border-sm"></span> rewriting...
-              </div>
-
-              <!-- AI Preview -->
               <div *ngIf="aiRewrittenText && !isRewriting" class="ai-preview-box mt-3">
                 <h5>Suggested Rewrite</h5>
-                <pre>{{ aiRewrittenText }}</pre>
+
+                <div class="ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
 
                 <button class="btn btn-success mt-2" (click)="applyRewrittenEmail()">
                   ✅ Use This Email
                 </button>
               </div>
+
             </div>
 
             <!-- Email Preview -->
@@ -325,7 +337,7 @@
                         </div>
 
                         <div class="email-body mt-2">
-                          <p [style.white-space]="'pre-line'">{{ email.body }}</p>
+                          <div [innerHTML]="email.body"></div>
                         </div>
 
                         <!-- Attachments section -->

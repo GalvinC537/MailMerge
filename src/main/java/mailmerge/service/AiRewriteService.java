@@ -37,13 +37,26 @@ public class AiRewriteService {
 
         String userContent =
             styleInstruction +
-                "\n\nIMPORTANT RULES:\n" +
-                "• DO NOT modify, remove, rename, expand, reformat, translate, or touch placeholders in double curly brackets (e.g., {{name}}, {{email}}, {{grade}}, {{company_name}}).\n" +
-                "• Keep ALL placeholders EXACTLY as they appear.\n" +
-                "• Do not add spaces inside them.\n" +
-                "• Do not add new placeholders.\n" +
-                "• Do not reference them in text.\n\n" +
-                "Return ONLY the rewritten email text — no explanations, no intro sentences, no quotes, no formatting labels.\n\n" +
+                "\n\nFORMAT & PLACEHOLDER RULES:\n" +
+                "1) The email text uses a simple markdown-like syntax for formatting:\n" +
+                "   - **text** = bold\n" +
+                "   - _text_ or *text* = italic\n" +
+                "   - ~text~ = underlined\n" +
+                "2) You MUST preserve all existing formatting markers exactly:\n" +
+                "   - If a span is wrapped in ** **, keep the ** markers in the same positions and only rewrite the text inside.\n" +
+                "   - If a span is wrapped in _ _ (or * *), keep those markers and only rewrite the text inside.\n" +
+                "   - If a span is wrapped in ~ ~, keep those markers and only rewrite the text inside.\n" +
+                "   - Do NOT remove, add, move, or rearrange any **, _, *, or ~ markers.\n" +
+                "   - Do NOT introduce new bold/italic/underline that was not formatted in the original.\n" +
+                "3) The email also contains placeholders using double curly brackets, e.g. {{name}}, {{email}}, {{grade}}, {{company_name}}.\n" +
+                "   - DO NOT modify, remove, rename, expand, reformat, translate, or touch any of these placeholders.\n" +
+                "   - Keep ALL placeholders EXACTLY as they appear.\n" +
+                "   - Do not add spaces inside them.\n" +
+                "   - Do not invent new placeholders.\n" +
+                "   - Do not refer to them explicitly in the rewritten text.\n" +
+                "4) Return ONLY the rewritten email text, in the same markdown-style format.\n" +
+                "   - Do NOT return HTML.\n" +
+                "   - Do NOT add explanations, intros, quotes, or labels.\n\n" +
                 "Email:\n" + original;
 
         Map<String, Object> request = Map.of(
@@ -88,4 +101,5 @@ public class AiRewriteService {
         dto.setRewrittenText(content != null ? content : "");
         return dto;
     }
+
 }

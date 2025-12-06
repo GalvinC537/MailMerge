@@ -1,4 +1,4 @@
-/* Mail Dashboard scss*/
+/* Mail Dashboard scss */
 
 $primary-blue: #0078d4;
 $hover-blue: #d0e7ff;
@@ -16,9 +16,9 @@ $danger-red: #dc3545;
 
 .back-row {
   display: flex;
-  align-items: center; /* keeps both vertically aligned */
+  align-items: center;
   flex-wrap: nowrap;
-  gap: 0.75rem; /* small gap between button and title */
+  gap: 0.75rem;
   padding-left: 1.5rem;
   margin-top: 0.5rem;
 }
@@ -31,7 +31,7 @@ $danger-red: #dc3545;
   border-radius: 6px;
   padding: 0.5rem 1rem;
   transition: all 0.2s ease-in-out;
-  white-space: nowrap; /* keeps arrow and text together */
+  white-space: nowrap;
 
   &:hover {
     background-color: $primary-blue;
@@ -44,11 +44,11 @@ $danger-red: #dc3545;
   font-weight: 600;
   color: #000000;
   margin-bottom: 0;
-  line-height: 1; /* aligns perfectly with button text */
+  line-height: 1;
 }
 
+/* LEFT PANEL */
 
-/* Left Side of the screen - so where the actual textblob is */
 .left-panel {
   padding: 1rem 2rem;
   border-right: 1px solid #e5e5e5;
@@ -63,7 +63,7 @@ $danger-red: #dc3545;
       box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.25);
     }
   }
-  /* The save and send button */
+
   button {
     background-color: #ffffff;
     color: $primary-blue;
@@ -84,7 +84,8 @@ $danger-red: #dc3545;
   }
 }
 
-/* Right Side of the screen - so where the how to use instrucions and the preview is */
+/* RIGHT PANEL */
+
 .right-panel {
   padding: 1rem 2rem;
   position: relative;
@@ -122,102 +123,44 @@ $danger-red: #dc3545;
   }
 
   .preview-item {
-    border: 2px solid $primary-blue;
-    border-radius: 6px;
-    padding: 0.75rem 1rem;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
     background-color: #fff;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+    margin-bottom: 1rem;
+    transition: background-color 0.2s ease;
 
-    pre {
+    &:hover {
+      background-color: #f4f9ff;
+    }
+
+    .email-header {
+      border-bottom: 1px solid #eee;
+      padding-bottom: 0.25rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .email-body {
+      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
+      font-size: 0.95rem;
+      color: #333;
       white-space: pre-wrap;
-      font-family: inherit;
+    }
+
+    .attachments {
+      background-color: #fafafa;
+      border: 1px solid #e5e5e5;
+      border-radius: 6px;
+      padding: 0.5rem;
       margin-top: 0.5rem;
+
+      .attachment-item {
+        font-size: 0.9rem;
+        color: #444;
+        padding: 0.25rem 0;
+      }
     }
-  }
-}
-
-/* Text used for status when saving and sending */
-.text-success {
-  color: $success-green !important;
-}
-
-.text-danger {
-  color: $danger-red !important;
-}
-
-/* These are the merge buttons styling */
-.merge-field {
-  background-color: #ffffff;
-  color: $primary-blue;
-  border: 2px solid $primary-blue;
-  border-radius: 6px;
-  font-weight: 500;
-  padding: 0.4rem 0.75rem;
-  cursor: grab;
-  transition: all 0.2s ease-in-out;
-  user-select: none;
-
-  &:hover {
-    background-color: $primary-blue;
-    color: #ffffff;
-  }
-
-  &:active {
-    cursor: grabbing;
-  }
-}
-
-
-/* Outlook-style preview design for right hand side panel preview */
-.preview-section {
-  background-color: #f9f9f9;
-  border-radius: 8px;
-  padding: 1rem;
-  max-height: 75vh;
-  overflow-y: auto;
-}
-
-.preview-item {
-  background-color: #ffffff;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  margin-bottom: 1rem;
-  transition: background-color 0.2s ease;
-
-  &:hover {
-    background-color: #f4f9ff;
-  }
-
-  .email-header {
-    border-bottom: 1px solid #eee;
-    padding-bottom: 0.25rem;
-    margin-bottom: 0.5rem;
-  }
-
-  .email-body {
-    font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-    font-size: 0.95rem;
-    color: #333;
-    white-space: pre-wrap; /* keeps line breaks */
-  }
-
-  .attachments {
-    background-color: #fafafa;
-    border: 1px solid #e5e5e5;
-    border-radius: 6px;
-    padding: 0.5rem;
-    margin-top: 0.5rem;
-
-    .attachment-item {
-      font-size: 0.9rem;
-      color: #444;
-      padding: 0.25rem 0;
-    }
-  }
-
-  .email-date {
-    font-size: 0.8rem;
   }
 }
 
@@ -245,8 +188,11 @@ $danger-red: #dc3545;
 }
 
 .email-header strong {
-  font-weight: 600; /* or 700 for heavier bold */
+  font-weight: 600;
 }
+
+/* Formatting toolbar */
+
 .btn-toolbar button {
   font-weight: 600;
   min-width: 2.2rem;
@@ -259,7 +205,8 @@ $danger-red: #dc3545;
   }
 }
 
-/* Progress Bar Styling */
+/* PROGRESS BAR */
+
 .progress-wrapper {
   background: #fafafa;
   border: 1px solid #e5e5e5;
@@ -268,7 +215,6 @@ $danger-red: #dc3545;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
 }
 
-/* Progress container */
 .status-progress {
   height: 26px;
   border-radius: 8px;
@@ -276,21 +222,18 @@ $danger-red: #dc3545;
   background-color: #e9ecef;
 }
 
-/* Active sending */
 .bg-progress {
   background-color: $primary-blue;
   transition: width 0.4s ease, background-color 0.3s ease;
   font-weight: 600;
 }
 
-/* Completion state */
 .bg-success-final {
   background-color: $success-green !important;
   transition: background-color 0.4s ease;
   font-weight: 700;
 }
 
-/* Log box */
 .progress-log {
   max-height: 220px;
   overflow-y: auto;
@@ -302,6 +245,7 @@ $danger-red: #dc3545;
   color: #333;
 }
 
+/* AI PANEL */
 
 .ai-btn {
   background-color: #ffffff;
@@ -333,55 +277,44 @@ $danger-red: #dc3545;
   border-radius: 6px;
   padding: 1rem;
 
-  pre {
-    white-space: pre-wrap;
+  .ai-preview-content {
+    white-space: normal; // or pre-wrap if you prefer
     font-family: inherit;
     margin: 0.5rem 0;
-  }
-
-  .spreadsheet-section {
-    background: #fafafa;
-    padding: 1rem;
-    border-radius: 8px;
-    max-height: 70vh;
-    overflow-y: auto;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .table {
-    background: #fff;
-  }
-
-  .excel-preview table {
-    background: white;
-    font-size: 0.85rem;
-  }
-
-  .merge-editor:empty::before {
-    content: attr(placeholder);
-    color: #999;
-  }
-
-  .merge-editor:empty {
-    min-height: 1.2em;
-  }
-
-  .merge-editor br {
-    display: none;
-  }
-
-  .merge-field {
-    padding: 4px 8px;
-    border-radius: 4px;
-    cursor: grab;
-    user-select: none;
-    display: inline-block;
-    color: #fff;
-  }
-
-  .merge-field:hover {
-    opacity: 0.85;
   }
 }
 
 
+
+
+/* EDITOR FORMATTING */
+
+.merge-editor b,
+.merge-editor strong {
+  font-weight: bold !important;
+}
+
+.merge-editor i,
+.merge-editor em {
+  font-style: italic !important;
+}
+
+.merge-editor u {
+  text-decoration: underline !important;
+}
+
+/* FIX BOLD/ITALIC/UNDERLINE IN PREVIEW (FINAL, CORRECT SELECTORS) */
+
+.preview-section .email-body * b,
+.preview-section .email-body * strong {
+  font-weight: 700 !important;
+}
+
+.preview-section .email-body * i,
+.preview-section .email-body * em {
+  font-style: italic !important;
+}
+
+.preview-section .email-body * u {
+  text-decoration: underline !important;
+}
