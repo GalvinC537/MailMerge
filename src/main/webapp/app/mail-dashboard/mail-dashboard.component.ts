@@ -10,6 +10,7 @@ import { AccountService } from 'app/core/auth/account.service';
 import { LoginService } from 'app/login/login.service';
 import { Account } from 'app/core/auth/account.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
+import { OneDriveService, OneDriveFileDto } from '../services/one-drive.service';
 import { AttachmentService } from 'app/project/attachment.service';
 import { forkJoin, of, switchMap, tap } from 'rxjs';
 import { AiRewriteService } from '../services/ai-rewrite.service';
@@ -40,6 +41,9 @@ export class MailDashboardComponent implements OnInit {
   spreadsheetTable: string[][] = [];
   spreadsheetPreviewVisible = false;
 
+  // rows as objects for token replacement
+  spreadsheetRows: Record<string, string>[] = [];
+
   isRewriting = false;
   customTone = ''; // user-defined style/tone
   aiVisible = false;
@@ -50,6 +54,15 @@ export class MailDashboardComponent implements OnInit {
   toField = '';
   ccField = '';
   bccField = '';
+
+  // in component
+  spreadsheetSource: 'LOCAL' | 'ONEDRIVE' = 'LOCAL';
+  oneDriveSpreadsheetName: string | null = null;
+  oneDriveLoading = false;
+
+  oneDriveFiles: OneDriveFileDto[] = [];
+  oneDrivePickerVisible = false;
+  oneDriveError: string | null = null;
 
   attachments: { id?: number; name: string; size: number; fileContentType: string; base64: string }[] = [];
   deletedAttachmentIds: number[] = [];
@@ -92,6 +105,7 @@ export class MailDashboardComponent implements OnInit {
   private readonly sanitizer = inject(DomSanitizer);
   private readonly attachmentService = inject(AttachmentService);
   private readonly aiRewriteService = inject(AiRewriteService);
+  private readonly oneDriveService = inject(OneDriveService);
 
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => this.account.set(account));
@@ -218,53 +232,30 @@ export class MailDashboardComponent implements OnInit {
   }
 
   onMergeFileChange(event: Event): void {
-    this.removeSpreadsheet();
+    // make sure we're in LOCAL mode when user uploads from device
+    this.spreadsheetSource = 'LOCAL';
+    this.oneDriveSpreadsheetName = null;
+
     const input = event.target as HTMLInputElement | null;
-    this.mergeFile = input?.files && input.files.length > 0 ? input.files[0] : null;
-    if (!this.mergeFile) return;
+    const file = input?.files && input.files.length > 0 ? input.files[0] : null;
+    if (!file) return;
 
-    this.mergeFileName = this.mergeFile.name;
-    this.spreadsheetFileContentType = this.mergeFile.type || 'application/octet-stream';
+    // clear previous spreadsheet state
+    this.removeSpreadsheet();
 
-    const reader = new FileReader();
-    reader.onload = e => {
-      const result = (e.target as FileReader).result;
-      if (!result) return;
-
-      const data = new Uint8Array(result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-
-      const sheetName = workbook.SheetNames[0];
-      const sheetData = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 });
-
-      if (Array.isArray(sheetData) && sheetData.length > 0) {
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        this.spreadsheetHeaders = sheetData[0].filter(h => !!h && h.trim() !== '');
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-expect-error
-        this.spreadsheetTable = sheetData;
-      }
-
-      this.previewMerge();
-    };
-
-    reader.readAsArrayBuffer(this.mergeFile);
-
-    // Save base64 for backend
-    const dataUrlReader = new FileReader();
-    dataUrlReader.onload = e => {
-      const dataUrl = (e.target as FileReader).result as string;
-      this.spreadsheetBase64 = dataUrl.split(',')[1] ?? '';
-    };
-    dataUrlReader.readAsDataURL(this.mergeFile);
+    // shared loader used by LOCAL, OneDrive and loaded-from-DB
+    this.loadSpreadsheetFile(file);
   }
 
   removeSpreadsheet(): void {
     this.mergeFile = null;
     this.spreadsheetBase64 = null;
+    this.mergeFileName = null;
+    this.oneDriveSpreadsheetName = null;
     this.spreadsheetFileContentType = null;
     this.spreadsheetHeaders = [];
+    this.spreadsheetTable = [];
+    this.spreadsheetRows = [];
     this.previewEmails = [];
   }
 
@@ -318,14 +309,20 @@ export class MailDashboardComponent implements OnInit {
         if (p.spreadsheetLink) {
           this.spreadsheetBase64 = p.spreadsheetLink;
           this.spreadsheetFileContentType = (p as any).spreadsheetFileContentType ?? 'application/octet-stream';
+
           const byteCharacters = atob(p.spreadsheetLink);
           const byteNumbers = new Array(byteCharacters.length);
-          for (let i = 0; i < byteCharacters.length; i++) byteNumbers[i] = byteCharacters.charCodeAt(i);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
           const byteArray = new Uint8Array(byteNumbers);
-          this.mergeFile = new File([byteArray], 'uploaded_spreadsheet.xlsx', {
+
+          const file = new File([byteArray], 'uploaded_spreadsheet.xlsx', {
             type: this.spreadsheetFileContentType!,
           });
-          this.parseSpreadsheetForHeaders(this.mergeFile);
+
+          // reuse shared loader (same as Local + OneDrive)
+          this.loadSpreadsheetFile(file);
         }
 
         this.attachmentsLoading = true;
@@ -364,6 +361,8 @@ export class MailDashboardComponent implements OnInit {
     if (!this.projectId) return;
     this.saving = true;
 
+    const hasSpreadsheet = !!this.spreadsheetBase64;
+
     const updated: Project = {
       ...(this.project ?? {}),
       id: this.projectId,
@@ -374,8 +373,9 @@ export class MailDashboardComponent implements OnInit {
       toField: this.toField,
       ccField: this.ccField,
       bccField: this.bccField,
-      spreadsheetLink: this.spreadsheetBase64 ?? undefined,
-      spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
+      // 👇 IMPORTANT: use null, not undefined, when cleared
+      spreadsheetLink: hasSpreadsheet ? this.spreadsheetBase64 : null,
+      spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -410,6 +410,8 @@ export class MailDashboardComponent implements OnInit {
           this.saveSuccess = true;
           this.deletedAttachmentIds = [];
           setTimeout(() => (this.saveSuccess = false), 3000);
+          // Optionally refresh this.project:
+          this.project = updated;
         },
         error: err => {
           console.error('❌ Save failed', err);
@@ -422,6 +424,8 @@ export class MailDashboardComponent implements OnInit {
   private saveProjectAndReturnObservable() {
     if (!this.projectId) return of(void 0);
 
+    const hasSpreadsheet = !!this.spreadsheetBase64;
+
     const updated: Project = {
       ...(this.project ?? {}),
       id: this.projectId,
@@ -432,8 +436,8 @@ export class MailDashboardComponent implements OnInit {
       toField: this.toField,
       ccField: this.ccField,
       bccField: this.bccField,
-      spreadsheetLink: this.spreadsheetBase64 ?? undefined,
-      spreadsheetFileContentType: this.spreadsheetFileContentType ?? undefined,
+      spreadsheetLink: hasSpreadsheet ? this.spreadsheetBase64 : null,
+      spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -461,6 +465,7 @@ export class MailDashboardComponent implements OnInit {
       }),
       tap(() => {
         this.deletedAttachmentIds = [];
+        this.project = updated;
       }),
       switchMap(() => of(void 0)),
     );
@@ -552,54 +557,48 @@ export class MailDashboardComponent implements OnInit {
   // Preview
   // -----------------------
 
+  // now uses parsed rows instead of rereading the file
   // eslint-disable-next-line @typescript-eslint/member-ordering
   previewMerge(): void {
-    if (!this.mergeFile) {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!this.spreadsheetRows || this.spreadsheetRows.length === 0) {
       this.previewEmails = [];
       return;
     }
 
-    const reader = new FileReader();
-    reader.onload = e => {
-      const result = (e.target as FileReader).result;
-      if (!result) return;
+    const rows = this.spreadsheetRows;
 
-      const data = new Uint8Array(result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.SheetNames[0];
-      const rows = XLSX.utils.sheet_to_json<Record<string, string>>(workbook.Sheets[sheet]);
-
-      this.previewEmails = rows.map(row => {
-        // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
-        const replaceTokens = (template: string) => {
-          // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-          let out = template ?? '';
-          Object.entries(row).forEach(([key, value]) => {
-            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
-            // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-            out = out.replace(regex, String(value ?? ''));
-          });
-          return out;
-        };
-
-        // STEP 1 — Replace tokens IN markdown
-        const bodyAfterTokenReplacement = replaceTokens(this.mergeBodyTemplate);
-
-        // STEP 2 — Convert markdown to HTML AFTER token replacement
-        const formattedBody = this.convertMarkdownToHtml(bodyAfterTokenReplacement);
-
-        return {
-          to: replaceTokens(this.toField) || '(missing To)',
-          cc: replaceTokens(this.ccField),
-          bcc: replaceTokens(this.bccField),
-          subject: replaceTokens(this.mergeSubjectTemplate),
-          body: this.sanitizer.bypassSecurityTrustHtml(formattedBody), // FINAL HTML WITH BOLD/ITALIC/UNDERLINE
-          attachments: this.attachments,
-        };
+    const replaceTokens = (template: string, row: Record<string, string>): string => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      let out = template ?? '';
+      Object.entries(row).forEach(([key, value]) => {
+        // escape regex special chars in header names just in case
+        const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(`{{\\s*${safeKey}\\s*}}`, 'g');
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        out = out.replace(regex, String(value ?? ''));
       });
+      return out;
     };
 
-    reader.readAsArrayBuffer(this.mergeFile);
+    this.previewEmails = rows.map(row => {
+      const subjectAfterTokens = replaceTokens(this.mergeSubjectTemplate, row);
+      const toAfterTokens = replaceTokens(this.toField, row);
+      const ccAfterTokens = replaceTokens(this.ccField, row);
+      const bccAfterTokens = replaceTokens(this.bccField, row);
+
+      const bodyTokenReplaced = replaceTokens(this.mergeBodyTemplate, row);
+      const bodyHtml = this.convertMarkdownToHtml(bodyTokenReplaced);
+
+      return {
+        to: toAfterTokens || '(missing To)',
+        cc: ccAfterTokens,
+        bcc: bccAfterTokens,
+        subject: subjectAfterTokens,
+        body: this.sanitizer.bypassSecurityTrustHtml(bodyHtml),
+        attachments: this.attachments,
+      };
+    });
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -623,24 +622,9 @@ export class MailDashboardComponent implements OnInit {
     if (this.howToVisible) this.previewVisible = false;
   }
 
+  // old helper kept for compatibility (now just delegates)
   private parseSpreadsheetForHeaders(file: File): void {
-    const reader = new FileReader();
-    reader.onload = e => {
-      const result = (e.target as FileReader).result;
-      if (!result) return;
-
-      const data = new Uint8Array(result as ArrayBuffer);
-      const workbook = XLSX.read(data, { type: 'array' });
-      const sheet = workbook.SheetNames[0];
-      const sheetData = XLSX.utils.sheet_to_json<Record<string, unknown>>(workbook.Sheets[sheet], { header: 1 });
-
-      if (Array.isArray(sheetData) && sheetData.length > 0) {
-        this.spreadsheetHeaders = (sheetData[0] as unknown as string[]).filter(h => !!h && h.trim() !== '');
-      }
-
-      this.previewMerge();
-    };
-    reader.readAsArrayBuffer(file);
+    this.loadSpreadsheetFile(file);
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -745,7 +729,7 @@ export class MailDashboardComponent implements OnInit {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         this.aiRewrittenText = res.rewrittenText ?? '';
 
-        // 🔁 Convert markdown formatting to HTML for preview
+        // Convert markdown formatting to HTML for preview
         const md = this.aiRewrittenText || '';
         const html = this.convertMarkdownToHtml(md);
         this.aiRewrittenPreview = this.sanitizer.bypassSecurityTrustHtml(html);
@@ -833,7 +817,7 @@ export class MailDashboardComponent implements OnInit {
 
     if (!md) md = '';
 
-    // ✅ use the same markdown → HTML converter as preview
+    // use the same markdown → HTML converter as preview
     let html = this.convertMarkdownToHtml(md);
 
     // ---- Token rendering ----
@@ -959,5 +943,216 @@ export class MailDashboardComponent implements OnInit {
         // Line breaks
         .replace(/\n/g, '<br>')
     );
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  setSpreadsheetSource(source: 'LOCAL' | 'ONEDRIVE'): void {
+    if (this.spreadsheetSource === source) return;
+
+    this.spreadsheetSource = source;
+
+    if (source === 'LOCAL') {
+      // Clear any OneDrive selection and file state
+      this.oneDriveSpreadsheetName = null;
+      this.removeSpreadsheet();
+    } else {
+      // Clear any local upload
+      this.removeSpreadsheet();
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  openOneDrivePicker(): void {
+    this.spreadsheetSource = 'ONEDRIVE';
+    this.oneDriveLoading = true;
+    this.oneDriveError = null;
+    this.oneDriveFiles = [];
+    this.oneDrivePickerVisible = false;
+
+    this.oneDriveService.listSpreadsheets().subscribe({
+      next: items => {
+        this.oneDriveLoading = false;
+
+        if (!items.length) {
+          this.oneDriveError = 'No spreadsheets found in your OneDrive root.';
+          return;
+        }
+
+        // just store them and show picker – no auto-selection
+        this.oneDriveFiles = items;
+        this.oneDrivePickerVisible = true;
+      },
+      error: err => {
+        this.oneDriveLoading = false;
+        console.error('❌ Failed to list OneDrive spreadsheets', err);
+        this.oneDriveError = 'Failed to load OneDrive spreadsheets. Please try again.';
+      },
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  selectOneDriveFile(file: OneDriveFileDto): void {
+    this.oneDriveLoading = true;
+    this.oneDriveError = null;
+
+    this.oneDriveService.getSpreadsheetContent(file.id, file.driveId).subscribe({
+      next: arrayBuffer => {
+        this.oneDriveLoading = false;
+        this.oneDrivePickerVisible = false;
+
+        console.warn('[OneDrive] typeof arrayBuffer:', typeof arrayBuffer);
+        console.warn('[OneDrive] instanceOf ArrayBuffer:', arrayBuffer instanceof ArrayBuffer);
+        console.warn('[OneDrive] byteLength:', arrayBuffer.byteLength);
+
+        // Optional: check if backend is sending JSON/error HTML instead of Excel
+        try {
+          const firstBytes = new Uint8Array(arrayBuffer).slice(0, 200);
+          const textPreview = new TextDecoder().decode(firstBytes);
+          console.error('[OneDrive] first 200 bytes as text:', textPreview);
+        } catch (e) {
+          console.warn('[OneDrive] Could not decode preview', e);
+        }
+
+        this.handleOneDriveSelection(arrayBuffer, file.name);
+      },
+      error: err => {
+        this.oneDriveLoading = false;
+        console.error('❌ Failed to download OneDrive spreadsheet', err);
+        this.oneDriveError = 'Failed to download OneDrive spreadsheet. Please try again.';
+      },
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  closeOneDrivePicker(): void {
+    this.oneDrivePickerVisible = false;
+  }
+
+  private loadSpreadsheetFile(file: File): void {
+    // remember file on the component
+    this.mergeFile = file;
+    this.mergeFileName = file.name;
+    this.spreadsheetFileContentType = file.type || 'application/octet-stream';
+
+    const reader = new FileReader();
+
+    reader.onload = e => {
+      const result = (e.target as FileReader).result;
+      if (!result) {
+        console.warn('[Spreadsheet] FileReader returned empty result');
+        this.spreadsheetHeaders = [];
+        this.spreadsheetTable = [];
+        this.spreadsheetRows = [];
+        this.previewMerge();
+        return;
+      }
+
+      const data = new Uint8Array(result as ArrayBuffer);
+
+      let workbook: XLSX.WorkBook;
+      try {
+        workbook = XLSX.read(data, { type: 'array' });
+      } catch (err) {
+        console.error('[Spreadsheet] XLSX.read failed', err);
+        this.spreadsheetHeaders = [];
+        this.spreadsheetTable = [];
+        this.spreadsheetRows = [];
+        this.previewMerge();
+        return;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+        console.warn('[Spreadsheet] Workbook has no sheets');
+        this.spreadsheetHeaders = [];
+        this.spreadsheetTable = [];
+        this.spreadsheetRows = [];
+        this.previewMerge();
+        return;
+      }
+
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+
+      // 👉 Read as a 2D matrix: first row = headers, rest = data rows
+      const matrix = XLSX.utils.sheet_to_json<(string | number | boolean | null)[]>(sheet, {
+        header: 1,
+        defval: '', // never null/undefined
+      });
+
+      if (!Array.isArray(matrix) || matrix.length === 0) {
+        console.warn('[Spreadsheet] sheet_to_json(header:1) returned empty matrix');
+        this.spreadsheetHeaders = [];
+        this.spreadsheetTable = [];
+        this.spreadsheetRows = [];
+        this.previewMerge();
+        return;
+      }
+
+      const headerRowRaw = matrix[0];
+      const dataRows = matrix.slice(1);
+
+      // Normalise header cells to clean strings
+      const headerRow = headerRowRaw.map(cell => String(cell ?? '').trim());
+
+      // Keep only non-empty header columns
+      const headerIndexes: number[] = [];
+      const headers: string[] = [];
+      headerRow.forEach((h, idx) => {
+        if (h !== '') {
+          headerIndexes.push(idx);
+          headers.push(h);
+        }
+      });
+
+      this.spreadsheetHeaders = headers;
+
+      // Build rows-as-objects for token replacement
+      this.spreadsheetRows = dataRows.map(row => {
+        const obj: Record<string, string> = {};
+        headerIndexes.forEach((colIdx, i) => {
+          const key = headers[i];
+          const cell = row[colIdx];
+          obj[key] = String(cell ?? '');
+        });
+        return obj;
+      });
+
+      // Build preview table: header row + data rows
+      this.spreadsheetTable = [headers, ...dataRows.map(row => headerIndexes.map(colIdx => String(row[colIdx] ?? '')))];
+
+      // Debug logs so you can see what's going on for local vs OneDrive
+      console.error('[Spreadsheet] Headers:', this.spreadsheetHeaders);
+      console.error('[Spreadsheet] First 3 rows of matrix:', matrix.slice(0, 3));
+      console.error('[Spreadsheet] First row object:', this.spreadsheetRows[0]);
+
+      // Build email previews using parsed rows
+      this.previewMerge();
+    };
+
+    reader.readAsArrayBuffer(file);
+
+    // 2) Base64 snapshot for saving to backend
+    const dataUrlReader = new FileReader();
+    dataUrlReader.onload = e => {
+      const dataUrl = (e.target as FileReader).result as string;
+      this.spreadsheetBase64 = dataUrl.split(',')[1] ?? '';
+    };
+    dataUrlReader.readAsDataURL(file);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  handleOneDriveSelection(fileBytes: ArrayBuffer, fileName: string): void {
+    this.spreadsheetSource = 'ONEDRIVE';
+    this.oneDriveSpreadsheetName = fileName;
+
+    this.removeSpreadsheet();
+
+    const blob = new Blob([fileBytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    });
+    const file = new File([blob], fileName || 'onedrive.xlsx', { type: blob.type });
+
+    this.loadSpreadsheetFile(file);
   }
 }

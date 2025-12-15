@@ -54,6 +54,7 @@ spring:
               - email
               - offline_access
               - Mail.Send
+              - Files.Read.All
           oidc:
             provider: azure
             client-id: ${AZURE_CLIENT_ID}
@@ -66,6 +67,7 @@ spring:
               - email
               - offline_access
               - Mail.Send
+              - Files.Read.All
         provider:
           azure:
             authorization-uri: https://login.microsoftonline.com/common/oauth2/v2.0/authorize
