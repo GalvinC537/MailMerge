@@ -42,7 +42,7 @@ class UserServiceIT {
 
     private static final String DEFAULT_LASTNAME = "doe";
 
-    @Autowired
+    @Autowired (required = false)
     private CacheManager cacheManager;
 
     private static final String DEFAULT_IMAGEURL = "http://placehold.it/50x50";
@@ -80,12 +80,12 @@ class UserServiceIT {
 
     @AfterEach
     public void cleanupAndCheck() {
-        cacheManager
-            .getCacheNames()
-            .stream()
-            .map(cacheName -> this.cacheManager.getCache(cacheName))
-            .filter(Objects::nonNull)
-            .forEach(Cache::clear);
+        if (cacheManager != null) {
+            cacheManager.getCacheNames().stream()
+                .map(cacheManager::getCache)
+                .filter(Objects::nonNull)
+                .forEach(Cache::clear);
+        }
         userRepository.deleteAll();
     }
 

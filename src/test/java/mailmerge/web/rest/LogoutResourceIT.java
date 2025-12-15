@@ -40,9 +40,6 @@ class LogoutResourceIT {
     @Autowired
     private OAuth2AuthorizedClientService authorizedClientService;
 
-    @Autowired
-    private ClientRegistration clientRegistration;
-
     private MockMvc restLogoutMockMvc;
 
     private Map<String, Object> claims;
@@ -53,10 +50,15 @@ class LogoutResourceIT {
         claims.put("groups", Collections.singletonList(AuthoritiesConstants.USER));
         claims.put("sub", 123);
 
-        SecurityContextHolder.getContext()
-            .setAuthentication(registerAuthenticationToken(authorizedClientService, clientRegistration, authenticationToken(claims)));
-        SecurityContextHolderAwareRequestFilter authInjector = new SecurityContextHolderAwareRequestFilter();
-        authInjector.afterPropertiesSet();
+        ClientRegistration clientRegistration = registrations.findByRegistrationId("oidc");
+
+        SecurityContextHolder.getContext().setAuthentication(
+            registerAuthenticationToken(
+                authorizedClientService,
+                clientRegistration,
+                authenticationToken(claims)
+            )
+        );
 
         this.restLogoutMockMvc = MockMvcBuilders.webAppContextSetup(this.context).build();
     }
