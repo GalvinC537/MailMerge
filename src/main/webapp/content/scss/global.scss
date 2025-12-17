@@ -266,3 +266,18 @@ angular-cli removes postcss-rtl processed inline css, processed rules must be ad
   text-decoration: underline !important;
 }
 
+:root {
+  /* Primary accent = CYAN */
+  --mm-primary: #00bcd4;
+  --mm-primary-soft: rgba(0, 188, 212, 0.14);
+  --mm-focus: 0 0 0 3px rgba(0, 188, 212, 0.25);
+
+  /* Outlook-like neutrals */
+  --mm-bg: #ffffff;
+  --mm-panel: #fafafa;
+  --mm-hover: #f3f3f3;
+  --mm-border: #e6e6e6;
+  --mm-text: #111;
+  --mm-muted: #666;
+  --mm-danger: #dc3545;
+}
