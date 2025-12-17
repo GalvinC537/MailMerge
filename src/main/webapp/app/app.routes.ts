@@ -51,6 +51,13 @@ const routes: Routes = [
     loadChildren: () => import('./entities/entity.routes'),
   },
 
+  {
+    path: 'mail-dashboard',
+    canActivate: [UserRouteAccessService],
+    loadComponent: () => import('./mail-dashboard/mail-dashboard.component').then(m => m.MailDashboardComponent),
+    data: { pageTitle: 'Mail Dashboard' },
+  },
+
   // Error routes (404, access denied, etc.)
   ...errorRoute,
 ];

@@ -8,6 +8,7 @@ import { Account } from 'app/core/auth/account.model';
   standalone: true,
   selector: 'jhi-home',
   templateUrl: './home.component.html',
+  styleUrl: './home.component.scss',
 })
 export default class HomeComponent implements OnInit {
   private readonly accountService = inject(AccountService);
@@ -22,7 +23,7 @@ export default class HomeComponent implements OnInit {
       this.account.set(account);
       // If user is already logged in, go straight to the dashboard
       if (account) {
-        this.router.navigate(['/project']);
+        this.router.navigate(['/mail-dashboard']);
       }
     });
   }

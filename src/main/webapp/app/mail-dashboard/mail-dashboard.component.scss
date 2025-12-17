@@ -1,320 +1,827 @@
-/* Mail Dashboard scss */
+/* =========================================================
+   MailMerge dashboard (improved) — drop-in replacement
+   Keeps existing class names & behavior
+   ========================================================= */
 
-$primary-blue: #0078d4;
-$hover-blue: #d0e7ff;
-$success-green: #2e7d32;
-$danger-red: #dc3545;
-
-.mail-dashboard {
-  background-color: #ffffff;
-  color: #000;
-  font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-  min-height: 90vh;
+/* Page shell */
+.mailmerge-shell {
+  display: grid;
+  grid-template-columns: clamp(240px, 16.6667vw, 360px) 1fr;
+  min-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px));
+  transition: grid-template-columns 180ms ease;
+  background: var(--mm-panel);
 }
 
-/* Back Button and Project name styling */
+/* Collapsed state */
+.mailmerge-shell.mm-sidebar-collapsed {
+  grid-template-columns: 72px 1fr; /* slightly roomier than 64px for icons */
+}
 
-.back-row {
+/* Sidebar panel */
+.mm-sidebar {
+  background: var(--mm-bg);
+  border-right: 1px solid var(--mm-border);
+  padding: 14px 12px;
+  min-width: 0;
+}
+
+/* When collapsed, tighten padding */
+.mailmerge-shell.mm-sidebar-collapsed .mm-sidebar {
+  padding: 14px 8px;
+}
+
+/* Hide sidebar text blocks when collapsed */
+.mailmerge-shell.mm-sidebar-collapsed .mm-sidebar-title,
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-name,
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-meta,
+.mailmerge-shell.mm-sidebar-collapsed .mm-empty,
+.mailmerge-shell.mm-sidebar-collapsed .mm-new-project-text {
+  display: none;
+}
+
+/* Center items nicely in collapsed mode */
+.mailmerge-shell.mm-sidebar-collapsed .mm-new-project {
+  justify-content: center;
+}
+
+/* Make project buttons feel like icon chips when collapsed */
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-item {
+  padding: 10px 0;
   display: flex;
-  align-items: center;
-  flex-wrap: nowrap;
-  gap: 0.75rem;
-  padding-left: 1.5rem;
-  margin-top: 0.5rem;
+  justify-content: center;
 }
 
-.back-btn {
-  background-color: #ffffff;
-  color: $primary-blue;
-  border: 2px solid $primary-blue;
-  font-weight: 500;
-  border-radius: 6px;
-  padding: 0.5rem 1rem;
-  transition: all 0.2s ease-in-out;
-  white-space: nowrap;
+/* Keep the + visible */
+.mailmerge-shell.mm-sidebar-collapsed .mm-plus {
+  width: 34px;
+  height: 34px;
+}
+
+/* Main content */
+.mm-main {
+  padding: 16px 18px;
+  min-width: 0;
+  background: var(--mm-panel);
+}
+
+/* Toggle button */
+.mm-sidebar-toggle {
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 12px;
+  height: 38px;
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 160ms ease, box-shadow 160ms ease;
 
   &:hover {
-    background-color: $primary-blue;
-    color: #ffffff;
+    background: var(--mm-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
   }
 }
 
-.project-title {
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #000000;
-  margin-bottom: 0;
+.mm-toggle-icon {
+  font-weight: 900;
+  font-size: 1.05rem;
   line-height: 1;
+  color: var(--mm-text);
 }
 
-/* LEFT PANEL */
+/* New project button */
+.mm-new-project {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
 
-.left-panel {
-  padding: 1rem 2rem;
-  border-right: 1px solid #e5e5e5;
+  border: 1px solid rgba(0, 188, 212, 0.55);
+  color: var(--mm-primary);
+  background: transparent;
 
-  input,
-  textarea {
-    border-radius: 6px;
-    border: 1px solid #ccc;
+  padding: 10px 12px;
+  border-radius: 12px;
+  font-weight: 700;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
 
-    &:focus {
-      border-color: $primary-blue;
-      box-shadow: 0 0 0 2px rgba(0, 120, 212, 0.25);
-    }
+  &:hover {
+    background: var(--mm-primary-soft);
+    border-color: rgba(0, 188, 212, 0.8);
   }
 
-  button {
-    background-color: #ffffff;
-    color: $primary-blue;
-    border: 2px solid $primary-blue;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
+  &:active {
+    transform: translateY(1px);
+  }
 
-    &:hover {
-      background-color: $primary-blue;
-      color: #ffffff;
-    }
-
-    &:disabled {
-      opacity: 0.6;
-      cursor: not-allowed;
-    }
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
   }
 }
 
-/* RIGHT PANEL */
-
-.right-panel {
-  padding: 1rem 2rem;
-  position: relative;
-
-  .preview-btn,
-  .howto-btn {
-    background-color: #ffffff;
-    color: $primary-blue;
-    border: 2px solid $primary-blue;
-    border-radius: 6px;
-    font-weight: 500;
-    transition: all 0.2s ease-in-out;
-
-    &:hover,
-    &.active {
-      background-color: $primary-blue;
-      color: #ffffff;
-    }
-  }
-
-  .howto-section,
-  .preview-section {
-    background-color: #fafafa;
-    border-radius: 8px;
-    padding: 1rem;
-    max-height: 70vh;
-    overflow-y: auto;
-    box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.05);
-  }
-
-  .preview-list {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-  }
-
-  .preview-item {
-    border: 1px solid #ddd;
-    border-radius: 8px;
-    padding: 1rem 1.25rem;
-    background-color: #fff;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-    margin-bottom: 1rem;
-    transition: background-color 0.2s ease;
-
-    &:hover {
-      background-color: #f4f9ff;
-    }
-
-    .email-header {
-      border-bottom: 1px solid #eee;
-      padding-bottom: 0.25rem;
-      margin-bottom: 0.5rem;
-    }
-
-    .email-body {
-      font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-      font-size: 0.95rem;
-      color: #333;
-      white-space: pre-wrap;
-    }
-
-    .attachments {
-      background-color: #fafafa;
-      border: 1px solid #e5e5e5;
-      border-radius: 6px;
-      padding: 0.5rem;
-      margin-top: 0.5rem;
-
-      .attachment-item {
-        font-size: 0.9rem;
-        color: #444;
-        padding: 0.25rem 0;
-      }
-    }
-  }
+.mm-plus {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 10px;
+  border: 1px solid rgba(0, 188, 212, 0.55);
+  color: var(--mm-primary);
 }
 
-.email-header {
-  border-bottom: 1px solid #eee;
-  padding-bottom: 0.25rem;
-  margin-bottom: 0.5rem;
+/* Sidebar section title */
+.mm-sidebar-title {
+  font-size: 0.78rem;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  font-weight: 800;
+  color: var(--mm-muted);
+  padding: 0 6px;
+  margin-top: 10px;
+}
+
+/* Projects list */
+.mm-projects-list {
+  overflow-y: auto;
+  padding-right: 2px;
+  margin-top: 6px;
   display: flex;
   flex-direction: column;
-  gap: 0.25rem;
+  gap: 6px;
+}
+
+.mm-project-item {
+  text-align: left;
+  width: 100%;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 12px;
+  padding: 10px 10px;
+
+  display: grid;
+  gap: 4px;
+  transition: background-color 160ms ease, border-color 160ms ease;
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &.active {
+    background: var(--mm-primary-soft);
+    border-color: rgba(0, 188, 212, 0.35);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+.mm-project-name {
+  font-weight: 750;
+  line-height: 1.2;
+  color: var(--mm-text);
+}
+
+.mm-project-meta {
+  font-size: 0.85rem;
+  color: var(--mm-muted);
+}
+
+.mm-empty {
+  color: var(--mm-muted);
+  padding: 12px 6px;
+}
+
+/* =========================================================
+   Toolbar
+   ========================================================= */
+
+.mm-toolbar {
+  display: grid;
+  grid-template-columns: minmax(220px, 1.2fr) minmax(260px, 1fr) minmax(220px, 1fr) minmax(220px, 1fr);
+  align-items: center;
+  gap: 12px;
+
+  border: 1px solid var(--mm-border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: var(--mm-bg);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.02);
+}
+
+/* shared segment styling */
+.mm-toolbar-seg {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* alignments per segment */
+.mm-toolbar-project {
+  justify-content: flex-start;
+}
+
+.mm-toolbar-sheet {
+  justify-content: center;
+}
+
+.mm-toolbar-format {
+  justify-content: center;
+}
+
+.mm-toolbar-tools {
+  justify-content: flex-end;
+}
+
+/* Title truncation + hierarchy */
+.mm-project-title {
+  max-width: 520px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-weight: 850;
+  color: var(--mm-text);
+}
+
+/* Select */
+.mm-select {
+  width: 180px;
+  border-radius: 12px;
+  border: 1px solid var(--mm-border);
+
+  &:focus {
+    box-shadow: var(--mm-focus);
+    border-color: rgba(0, 188, 212, 0.6);
+  }
+}
+
+/* Buttons */
+.mm-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  padding: 9px 10px;
+  border-radius: 12px;
+  font-weight: 700;
+  color: var(--mm-text);
+  line-height: 1;
+  transition: background-color 160ms ease, border-color 160ms ease, transform 120ms ease;
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &.active {
+    background: var(--mm-primary-soft);
+    border-color: rgba(0, 188, 212, 0.35);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.mm-icon-btn {
+  border: 1px solid transparent;
+  background: transparent;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 160ms ease, transform 120ms ease;
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+
+  &:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+/* Sub row */
+.mm-subrow {
+  margin-top: 10px;
+  display: flex;
+  gap: 10px;
+}
+
+.mm-subrow-left {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Pill */
+.mm-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-panel);
+  padding: 8px 10px;
+  border-radius: 14px;
+  min-width: 0;
+
+  a {
+    color: var(--mm-text);
+    text-decoration: none;
+    max-width: 260px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.mm-badge {
+  font-size: 0.75rem;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 2px 8px;
+  background: var(--mm-primary-soft);
+  border: 1px solid rgba(0, 188, 212, 0.35);
+}
+
+.mm-muted {
+  color: var(--mm-muted);
+}
+
+.mm-error {
+  color: var(--mm-danger);
+  font-weight: 700;
+  margin-top: 6px;
+}
+
+/* NEW: warning style used in your HTML */
+.mm-warn {
+  color: #8a6d00; /* readable amber */
+  font-weight: 750;
+
+  .mm-link {
+    margin-left: 8px;
+  }
+}
+
+/* Link-style buttons */
+.mm-link {
+  border: 0;
+  background: transparent;
+  color: var(--mm-muted);
+  font-weight: 700;
+  padding: 0;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+    border-radius: 8px;
+  }
+}
+
+/* OneDrive picker */
+.mm-onedrive-picker {
+  margin-top: 10px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.mm-onedrive-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+/* Merge fields row */
+.mm-merge-fields-row {
+  margin-top: 10px;
+  border: 1px solid var(--mm-border);
+  border-radius: 14px;
+  background: var(--mm-bg);
+  padding: 10px 12px;
+}
+
+.mm-merge-fields-scroll {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  white-space: nowrap;
+  padding-bottom: 4px;
+}
+
+.mm-merge-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 800;
+  cursor: grab;
+  user-select: none;
+}
+
+/* Action row */
+.mm-action-row {
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: space-between;
+  flex-wrap: wrap;
+}
+
+.mm-action-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.mm-action-right {
+  flex: 1 1 320px;
+  min-width: 260px;
+}
+
+/* Dropdown */
+.mm-dropdown {
+  position: relative;
+}
+
+.mm-caret {
+  margin-left: 6px;
+  opacity: 0.8;
+}
+
+.mm-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 10;
+
+  min-width: 200px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.10);
+  padding: 6px;
+}
+
+.mm-menu-item {
+  width: 100%;
+  text-align: left;
+  border: 0;
+  background: transparent;
+  padding: 10px 10px;
+  border-radius: 12px;
+  font-weight: 750;
+  color: var(--mm-text);
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+.mm-status-inline {
+  display: inline-flex;
+  gap: 10px;
+  align-items: center;
+  font-weight: 750;
+  flex-wrap: wrap;
+}
+
+.mm-ok {
+  color: #2e7d32;
+}
+
+.mm-bad {
+  color: var(--mm-danger);
+}
+
+/* Progress */
+.mm-progress {
+  width: 100%;
+  height: 22px;
+  border-radius: 12px;
+  overflow: hidden;
+
+  .progress-bar {
+    background: var(--mm-primary);
+    font-weight: 800;
+  }
+}
+
+/* Form */
+.mm-form {
+  margin-top: 12px;
+}
+
+/* Compose */
+.mm-compose {
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.mm-compose-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--mm-border);
+}
+
+.mm-compose-label {
+  width: 62px;
+  flex: 0 0 auto;
+  color: var(--mm-muted);
+  font-weight: 800;
+}
+
+.mm-line-editor {
+  flex: 1 1 auto;
+  min-width: 0;
+  outline: none;
+  border: 0;
+  background: transparent;
+  padding: 2px 0;
+  line-height: 1.4;
+  color: var(--mm-text);
+}
+
+.mm-compose-body {
+  padding: 12px;
+}
+
+.mm-body-editor {
+  min-height: 260px;
+  outline: none;
+  border: 0;
+  background: transparent;
+  line-height: 1.55;
+  color: var(--mm-text);
+}
+
+/* Placeholder for contenteditable */
+.mm-line-editor:empty::before,
+.mm-body-editor:empty::before {
+  content: attr(data-placeholder);
+  color: var(--mm-muted);
+  opacity: 0.85;
+}
+
+/* Hide placeholder on focus */
+.mm-line-editor:focus:empty::before,
+.mm-body-editor:focus:empty::before {
+  content: "";
+}
+
+.mm-link-btn {
+  border: 0;
+  background: transparent;
+  color: var(--mm-muted);
+  font-weight: 800;
+  padding: 6px 8px;
+  border-radius: 10px;
+
+  &:hover {
+    background: var(--mm-hover);
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+/* Attachments */
+.mm-attachments {
+  margin-top: 10px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  padding: 12px;
+}
+
+.mm-attachments-title {
+  font-weight: 850;
+  margin-bottom: 8px;
+  color: var(--mm-text);
+}
+
+.mm-attachment-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  a {
+    text-decoration: none;
+    color: var(--mm-text);
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+.mm-link-danger {
+  border: 0;
+  background: transparent;
+  color: var(--mm-danger);
+  font-weight: 800;
+  margin-left: auto;
+
+  &:hover {
+    text-decoration: underline;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+    border-radius: 10px;
+  }
+}
+
+/* Panels */
+.mm-panels {
+  margin-top: 14px;
+  display: grid;
+  gap: 12px;
+}
+
+.mm-panel {
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.mm-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.mm-preview-item {
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
+  border-radius: 14px;
+  padding: 12px;
+  transition: background-color 160ms ease;
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+}
+
+.mm-email-header {
+  border-bottom: 1px solid var(--mm-border);
+  padding-bottom: 6px;
+  margin-bottom: 8px;
   position: relative;
 
-  .email-date {
+  .mm-email-date {
     position: absolute;
     right: 0;
     top: 0;
     font-size: 0.8rem;
-    color: #666;
+    color: var(--mm-muted);
   }
 
   strong {
-    min-width: 70px;
-    display: inline-block;
+    font-weight: 850;
   }
 }
 
-.email-header strong {
-  font-weight: 600;
+.mm-email-body {
+  color: var(--mm-text);
 }
 
-/* Formatting toolbar */
-
-.btn-toolbar button {
-  font-weight: 600;
-  min-width: 2.2rem;
-  line-height: 1;
-  padding: 0.25rem 0.5rem;
-  border-radius: 4px;
-
-  &:hover {
-    background-color: $hover-blue;
-  }
+/* Preview attachments chips (used in your HTML) */
+.mm-preview-attachments {
+  color: var(--mm-text);
 }
 
-/* PROGRESS BAR */
-
-.progress-wrapper {
-  background: #fafafa;
-  border: 1px solid #e5e5e5;
-  border-radius: 8px;
-  padding: 1rem 1.25rem;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+.mm-attachment-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--mm-panel);
+  border: 1px solid var(--mm-border);
+  margin: 4px 6px 0 0;
 }
 
-.status-progress {
-  height: 26px;
-  border-radius: 8px;
-  overflow: hidden;
-  background-color: #e9ecef;
-}
-
-.bg-progress {
-  background-color: $primary-blue;
-  transition: width 0.4s ease, background-color 0.3s ease;
-  font-weight: 600;
-}
-
-.bg-success-final {
-  background-color: $success-green !important;
-  transition: background-color 0.4s ease;
-  font-weight: 700;
-}
-
-.progress-log {
-  max-height: 220px;
-  overflow-y: auto;
-  padding: 0.5rem;
-  border-radius: 6px;
-  background: #ffffff;
-  border: 1px solid #ececec;
-  font-size: 0.9rem;
-  color: #333;
-}
-
-/* AI PANEL */
-
-.ai-btn {
-  background-color: #ffffff;
-  color: $primary-blue;
-  border: 2px solid $primary-blue;
-  border-radius: 6px;
-  font-weight: 500;
-  transition: all 0.2s ease-in-out;
-
-  &:hover,
-  &.active {
-    background-color: $primary-blue;
-    color: #ffffff;
-  }
-}
-
-.ai-panel {
-  background: #fafafa;
-  border-radius: 8px;
-  padding: 1.25rem;
-  border: 1px solid #e3e3e3;
-  max-height: 72vh;
-  overflow-y: auto;
-}
-
-.ai-preview-box {
-  background: #ffffff;
-  border: 2px solid $primary-blue;
-  border-radius: 6px;
-  padding: 1rem;
-
-  .ai-preview-content {
-    white-space: normal; // or pre-wrap if you prefer
-    font-family: inherit;
-    margin: 0.5rem 0;
-  }
-}
-
-
-
-
-/* EDITOR FORMATTING */
-
+/* Keep formatting correctness */
 .merge-editor b,
 .merge-editor strong {
   font-weight: bold !important;
 }
-
 .merge-editor i,
 .merge-editor em {
   font-style: italic !important;
 }
-
 .merge-editor u {
   text-decoration: underline !important;
 }
 
-/* FIX BOLD/ITALIC/UNDERLINE IN PREVIEW (FINAL, CORRECT SELECTORS) */
-
-.preview-section .email-body * b,
-.preview-section .email-body * strong {
+.mm-panel .mm-email-body * b,
+.mm-panel .mm-email-body * strong {
   font-weight: 700 !important;
 }
-
-.preview-section .email-body * i,
-.preview-section .email-body * em {
+.mm-panel .mm-email-body * i,
+.mm-panel .mm-email-body * em {
   font-style: italic !important;
 }
-
-.preview-section .email-body * u {
+.mm-panel .mm-email-body * u {
   text-decoration: underline !important;
+}
+
+/* =========================================================
+   Responsive improvements (no markup changes needed)
+   ========================================================= */
+
+@media (max-width: 1100px) {
+  .mm-toolbar {
+    grid-template-columns: 1fr 1fr;
+    row-gap: 10px;
+  }
+  .mm-toolbar-tools {
+    justify-content: flex-start;
+  }
+}
+
+@media (max-width: 720px) {
+  .mailmerge-shell {
+    grid-template-columns: 1fr; /* stack sidebar & main */
+  }
+
+  .mm-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--mm-border);
+  }
+
+  .mm-toolbar {
+    grid-template-columns: 1fr;
+  }
+
+  .mm-toolbar-project,
+  .mm-toolbar-sheet,
+  .mm-toolbar-format,
+  .mm-toolbar-tools {
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .mm-select {
+    width: 100%;
+    max-width: 360px;
+  }
 }

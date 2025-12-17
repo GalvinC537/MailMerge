@@ -1,57 +1,64 @@
 @import 'bootstrap/scss/functions';
 @import 'bootstrap/scss/variables';
 
-/* scss for the nav bar to include the home button and the account button*/
-
-$primary-blue: #0078d4;
-$hover-blue: #d0e7ff;
+/* Navbar SCSS using global cyan theme variables */
 
 .navbar {
-  background-color: #ffffff !important;
+  background-color: var(--mm-bg) !important;
   padding: 0.5rem 1rem;
-  border-bottom: 1px solid #e5e5e5;
+  border-bottom: 1px solid var(--mm-border);
 }
 
 .navbar-brand {
   .navbar-title {
     font-size: 1.25rem;
     font-weight: 600;
+    color: var(--mm-text);
   }
 }
 
 .nav-link {
-  color: $primary-blue !important;
+  color: var(--mm-primary) !important;
   font-weight: 500;
-  transition: all 0.2s ease-in-out;
+  transition: background-color 0.2s ease, color 0.2s ease;
   border-radius: 6px;
   padding: 0.5rem 0.75rem;
 
   &:hover {
-    background-color: $hover-blue;
-    color: $primary-blue !important;
+    background-color: var(--mm-primary-soft);
+    color: var(--mm-primary) !important;
   }
 
   &.active {
-    background-color: $hover-blue;
+    background-color: var(--mm-primary-soft);
     font-weight: 600;
   }
 }
 
 .dropdown-menu {
   border-radius: 8px;
-  border: 1px solid #e5e5e5;
+  border: 1px solid var(--mm-border);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  background-color: var(--mm-bg);
 }
 
 .dropdown-item {
-  color: #000;
-  &:hover {
-    background-color: $hover-blue;
-    color: $primary-blue;
+  color: var(--mm-text);
+
+  &:hover,
+  &:focus {
+    background-color: var(--mm-primary-soft);
+    color: var(--mm-primary);
+  }
+
+  &.active,
+  &:active {
+    background-color: var(--mm-primary);
+    color: #fff;
   }
 }
 
-/* This is for the logo */
+/* Logo */
 .logo-img {
   height: 45px;
   width: 45px;
@@ -66,10 +73,21 @@ $hover-blue: #d0e7ff;
   width: 1.75em;
 }
 
-/* ==========================================================================
-  Navbar version text (if used)
-  ========================================================================== */
+/* Version text */
 .navbar-version {
   font-size: 0.65em;
-  color: #5e5e5e;
+  color: var(--mm-muted);
+}
+
+/* Brand (MailMerge) */
+.navbar-brand,
+.navbar-brand:hover,
+.navbar-brand:focus {
+  color: var(--mm-primary) !important; /* cyan */
+  text-decoration: none;
+}
+
+/* If your template uses .navbar-title inside the brand */
+.navbar-brand .navbar-title {
+  color: inherit;
 }

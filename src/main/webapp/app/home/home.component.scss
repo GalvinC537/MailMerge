@@ -1,54 +1,49 @@
-/* This is the scss for home, this is the sign in page*/
+/* home.scss (sign-in page) */
 
-$primary-blue: #0078d4;
-$hover-blue: #d0e7ff;
+/* Pull from global :root variables */
+$mm-primary: var(--mm-primary);
+$mm-primary-soft: var(--mm-primary-soft);
+$mm-focus: var(--mm-focus);
 
 .home-container {
-  background-color: #ffffff;
-  color: #000000;
+  background-color: var(--mm-bg);
+  color: var(--mm-text);
   font-family: 'Segoe UI', Roboto, Arial, sans-serif;
   padding-top: 4rem;
 
   h1 {
     font-weight: 600;
-    color: #000;
+    color: var(--mm-text);
   }
 
   .lead {
-    color: #5e5e5e;
+    color: var(--mm-muted);
   }
 }
 
-/* For the sign in button */
+/* Sign in button */
 .sign-in-btn {
   background-color: #ffffff;
-  color: $primary-blue;
-  border: 2px solid $primary-blue;
-  font-weight: 500;
-  padding: 0.5rem 1.5rem;
-  border-radius: 6px;
-  transition: all 0.2s ease-in-out;
+  color: $mm-primary;
+  border: 2px solid $mm-primary;
+  font-weight: 600;
+  padding: 0.6rem 1.6rem;
+  border-radius: 8px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
 
   &:hover {
-    background-color: $primary-blue;
+    background-color: $mm-primary;
     color: #ffffff;
-    border-color: $primary-blue;
+    border-color: $mm-primary;
   }
 
-  &:focus {
+  &:focus,
+  &:focus-visible {
     outline: none;
-    box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.3);
+    box-shadow: $mm-focus;
   }
-}
 
-/* High DPI screens - from Jhipster template */
-@media only screen and (-webkit-min-device-pixel-ratio: 2),
-only screen and (-moz-min-device-pixel-ratio: 2),
-only screen and (-o-min-device-pixel-ratio: 2/1),
-only screen and (min-resolution: 192dpi),
-only screen and (min-resolution: 2dppx) {
-  .hipster {
-    background: url('../../content/images/jhipster_family_member_3.svg') no-repeat center top;
-    background-size: contain;
+  &:active {
+    transform: translateY(1px);
   }
 }

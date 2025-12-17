@@ -82,4 +82,18 @@ export class ProjectService {
   }): Observable<any> {
     return this.http.post('/api/mail-merge/send-advanced', payload);
   }
+
+  // ✅ NEW: Test version (sends ONE merged email to the current user's email)
+  sendMailMergeTestWithMeta(payload: {
+    subjectTemplate: string;
+    bodyTemplate: string;
+    toTemplate: string;
+    ccTemplate: string;
+    bccTemplate: string;
+    spreadsheet: string | null;
+    spreadsheetFileContentType: string | null;
+    attachments: { name: string; fileContentType: string; file: string }[];
+  }): Observable<any> {
+    return this.http.post('/api/mail-merge/send-test', payload);
+  }
 }
