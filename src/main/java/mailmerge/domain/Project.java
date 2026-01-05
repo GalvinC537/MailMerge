@@ -33,6 +33,10 @@ public class Project implements Serializable {
     @Column(name = "name", nullable = false)
     private String name;
 
+    // ✅ NEW: store the original spreadsheet filename (e.g. "scores.xlsx")
+    @Column(name = "spreadsheet_name")
+    private String spreadsheetName;
+
     @Lob
     @Column(name = "spreadsheet_link")
     private byte[] spreadsheetLink;
@@ -114,6 +118,19 @@ public class Project implements Serializable {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    public String getSpreadsheetName() {
+        return this.spreadsheetName;
+    }
+
+    public Project spreadsheetName(String spreadsheetName) {
+        this.setSpreadsheetName(spreadsheetName);
+        return this;
+    }
+
+    public void setSpreadsheetName(String spreadsheetName) {
+        this.spreadsheetName = spreadsheetName;
     }
 
     public byte[] getSpreadsheetLink() {
@@ -377,6 +394,7 @@ public class Project implements Serializable {
         return "Project{" +
             "id=" + getId() +
             ", name='" + getName() + "'" +
+            ", spreadsheetName='" + getSpreadsheetName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
             ", spreadsheetLinkContentType='" + getSpreadsheetLinkContentType() + "'" +
             ", spreadsheetFileContentType='" + getSpreadsheetFileContentType() + "'" +

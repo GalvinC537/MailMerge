@@ -1,3 +1,4 @@
+<!-- mail-dashboard.component.html -->
 <div class="mailmerge-shell" [class.mm-sidebar-collapsed]="sidebarCollapsed">
   <!-- LEFT SIDEBAR (1/6) -->
   <aside class="mm-sidebar" role="navigation" aria-label="Projects">
@@ -19,12 +20,26 @@
 
     <div class="mm-sidebar-title">Projects</div>
 
+    <div class="mm-project-search">
+      <input
+        type="text"
+        class="mm-project-search-input"
+        [(ngModel)]="projectSearch"
+        name="projectSearch"
+        placeholder="Search projects…"
+        autocomplete="off"
+        spellcheck="false"
+        [attr.aria-label]="'Search projects'"
+      />
+    </div>
+
     <ng-container *ngIf="projects?.length; else noProjectsTpl">
-      <div class="mm-projects-list">
+      <!-- Ungrouped (status is null/undefined) -->
+      <div class="mm-projects-list" *ngIf="ungroupedProjects.length">
         <button
           type="button"
           class="mm-project-item"
-          *ngFor="let p of projects; trackBy: trackByProjectId"
+          *ngFor="let p of ungroupedProjects; trackBy: trackByProjectId"
           [class.active]="p.id === projectId"
           (click)="openProjectFromSidebar(p)"
           [attr.title]="p.name || 'Untitled Project'"
@@ -35,6 +50,85 @@
           </div>
         </button>
       </div>
+
+      <div
+        class="mm-folder-divider"
+        *ngIf="ungroupedProjects.length && (pendingProjects.length || failedProjects.length || sentProjects.length)"
+      ></div>
+
+      <!-- Folder: PENDING -->
+      <button type="button" class="mm-folder" (click)="toggleFolder('PENDING')">
+        <span class="mm-folder-caret">{{ folderOpen.PENDING ? '▾' : '▸' }}</span>
+        <span class="mm-folder-name">Pending</span>
+        <span class="mm-folder-count">{{ pendingProjects.length }}</span>
+      </button>
+
+      <div class="mm-projects-list" *ngIf="folderOpen.PENDING && pendingProjects.length">
+        <button
+          type="button"
+          class="mm-project-item"
+          *ngFor="let p of pendingProjects; trackBy: trackByProjectId"
+          [class.active]="p.id === projectId"
+          (click)="openProjectFromSidebar(p)"
+          [attr.title]="p.name || 'Untitled Project'"
+        >
+          <div class="mm-project-name">{{ p.name || 'Untitled Project' }}</div>
+          <div class="mm-project-meta">
+            <span class="mm-status">{{ p.status }}</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Folder: FAILED -->
+      <button type="button" class="mm-folder" (click)="toggleFolder('FAILED')">
+        <span class="mm-folder-caret">{{ folderOpen.FAILED ? '▾' : '▸' }}</span>
+        <span class="mm-folder-name">Failed</span>
+        <span class="mm-folder-count">{{ failedProjects.length }}</span>
+      </button>
+
+      <div class="mm-projects-list" *ngIf="folderOpen.FAILED && failedProjects.length">
+        <button
+          type="button"
+          class="mm-project-item"
+          *ngFor="let p of failedProjects; trackBy: trackByProjectId"
+          [class.active]="p.id === projectId"
+          (click)="openProjectFromSidebar(p)"
+          [attr.title]="p.name || 'Untitled Project'"
+        >
+          <div class="mm-project-name">{{ p.name || 'Untitled Project' }}</div>
+          <div class="mm-project-meta">
+            <span class="mm-status">{{ p.status }}</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- Folder: SENT -->
+      <button type="button" class="mm-folder" (click)="toggleFolder('SENT')">
+        <span class="mm-folder-caret">{{ folderOpen.SENT ? '▾' : '▸' }}</span>
+        <span class="mm-folder-name">Sent</span>
+        <span class="mm-folder-count">{{ sentProjects.length }}</span>
+      </button>
+
+      <div class="mm-projects-list" *ngIf="folderOpen.SENT && sentProjects.length">
+        <button
+          type="button"
+          class="mm-project-item"
+          *ngFor="let p of sentProjects; trackBy: trackByProjectId"
+          [class.active]="p.id === projectId"
+          (click)="openProjectFromSidebar(p)"
+          [attr.title]="p.name || 'Untitled Project'"
+        >
+          <div class="mm-project-name">{{ p.name || 'Untitled Project' }}</div>
+          <div class="mm-project-meta">
+            <span class="mm-status">{{ p.status }}</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- If search returns zero across everything -->
+      <div class="mm-empty" *ngIf="projectSearch && !ungroupedProjects.length && !pendingProjects.length && !failedProjects.length && !sentProjects.length">
+        No matching projects.
+      </div>
     </ng-container>
 
     <ng-template #noProjectsTpl>
@@ -44,450 +138,470 @@
 
   <!-- RIGHT MAIN (5/6) -->
   <main class="mm-main" role="main">
-    <!-- hidden inputs triggered from toolbar -->
-    <input
-      #mergeFileInput
-      type="file"
-      class="d-none"
-      accept=".xlsx"
-      (change)="onMergeFileChange($event)"
-      [disabled]="oneDriveLoading"
-    />
+    <!-- ✅ Blank RHS until a project is selected/created -->
+    <ng-container *ngIf="hasSelectedProject; else noProjectSelectedTpl">
+      <!-- hidden inputs triggered from toolbar -->
+      <input
+        #mergeFileInput
+        type="file"
+        class="d-none"
+        accept=".xlsx"
+        (change)="onMergeFileChange($event)"
+        [disabled]="oneDriveLoading"
+      />
 
-    <input #attachmentsInput type="file" class="d-none" multiple (change)="onAttachmentsChange($event)" />
+      <input #attachmentsInput type="file" class="d-none" multiple (change)="onAttachmentsChange($event)" />
 
-    <!-- A) TOP TOOLBAR (single row, exact order) -->
-    <div class="mm-toolbar">
-      <!-- 1) Project -->
-      <div class="mm-toolbar-seg mm-toolbar-project">
-        <div class="mm-project-title" title="{{ projectName || 'Untitled Project' }}">
-          {{ projectName || 'Untitled Project' }}
+      <!-- A) TOP TOOLBAR (single row, exact order) -->
+      <div class="mm-toolbar">
+        <!-- 1) Project -->
+        <div class="mm-toolbar-seg mm-toolbar-project">
+          <div class="mm-project-title" title="{{ projectName || 'Untitled Project' }}">
+            {{ projectName || 'Untitled Project' }}
+          </div>
+
+          <button
+            type="button"
+            class="mm-icon-btn"
+            title="Delete project"
+            (click)="deleteCurrentProject()"
+            [disabled]="!projectId"
+          >
+            <fa-icon [icon]="faTrash"></fa-icon>
+          </button>
         </div>
 
-        <button
-          type="button"
-          class="mm-icon-btn"
-          title="Delete project"
-          (click)="deleteCurrentProject()"
-          [disabled]="!projectId"
-        >
-          <fa-icon [icon]="faTrash"></fa-icon>
-        </button>
-      </div>
+        <!-- 2) Spreadsheet -->
+        <div class="mm-toolbar-seg mm-toolbar-sheet">
+          <ng-container *ngIf="!hasConnectedSpreadsheet; else connectedSpreadsheetTpl">
+            <select class="form-select mm-select" [ngModel]="spreadsheetSource" (ngModelChange)="setSpreadsheetSource($event)">
+              <option [ngValue]="'LOCAL'">Local spreadsheet</option>
+              <option [ngValue]="'ONEDRIVE'">OneDrive</option>
+            </select>
 
-      <!-- 2) Spreadsheet -->
-      <div class="mm-toolbar-seg mm-toolbar-sheet">
-        <ng-container *ngIf="!hasConnectedSpreadsheet; else connectedSpreadsheetTpl">
-          <select class="form-select mm-select" [ngModel]="spreadsheetSource" (ngModelChange)="setSpreadsheetSource($event)">
-            <option [ngValue]="'LOCAL'">Local spreadsheet</option>
-            <option [ngValue]="'ONEDRIVE'">OneDrive</option>
-          </select>
+            <button type="button" class="mm-btn" title="Connect Spreadsheet" (click)="connectSpreadsheet()" [disabled]="oneDriveLoading">
+              <fa-icon [icon]="faLink"></fa-icon>
+            </button>
+          </ng-container>
+
+          <ng-template #connectedSpreadsheetTpl>
+            <div class="mm-pill mm-toolbar-pill">
+              <fa-icon [icon]="oneDriveSpreadsheetName ? faCloud : faFileExcel" class="me-2"></fa-icon>
+
+              <a href="#" (click)="downloadSpreadsheet($event)">{{ connectedSpreadsheetName }}</a>
+
+              <span *ngIf="mergeFile && !oneDriveSpreadsheetName" class="mm-muted">
+                ({{ (mergeFile.size / 1024).toFixed(1) }} KB)
+              </span>
+
+              <span *ngIf="oneDriveSpreadsheetName" class="mm-badge">OneDrive</span>
+
+              <button type="button" class="mm-icon-btn" title="Remove spreadsheet" (click)="removeSpreadsheet()">
+                <fa-icon [icon]="faTrash"></fa-icon>
+              </button>
+            </div>
+          </ng-template>
+        </div>
+
+        <!-- 3) Formatting -->
+        <div class="mm-toolbar-seg mm-toolbar-format">
+          <button type="button" class="mm-icon-btn" title="Bold" (mousedown)="formatFromToolbar($event, 'bold')"><b>B</b></button>
+          <button type="button" class="mm-icon-btn" title="Italic" (mousedown)="formatFromToolbar($event, 'italic')"><i>I</i></button>
+          <button type="button" class="mm-icon-btn" title="Underline" (mousedown)="formatFromToolbar($event, 'underline')"><u>U</u></button>
+
+          <button type="button" class="mm-icon-btn" title="Insert HTTPS link" (mousedown)="insertHttpsLink($event)">
+            🔗
+          </button>
+
+          <button type="button" class="mm-icon-btn" title="Attachments" (click)="openAttachmentsPicker()">
+            <fa-icon [icon]="faPaperclip"></fa-icon>
+          </button>
+        </div>
+
+        <!-- 4) Right tools -->
+        <div class="mm-toolbar-seg mm-toolbar-tools">
+          <button
+            type="button"
+            class="mm-btn"
+            title="Compose"
+            [class.active]="activePanel === 'compose'"
+            (click)="setPanel('compose')"
+          >
+            <fa-icon class="me-2" [icon]="faCompose"></fa-icon>
+          </button>
 
           <button
             type="button"
             class="mm-btn"
-            title="Connect Spreadsheet"
-            (click)="connectSpreadsheet()"
-            [disabled]="oneDriveLoading"
+            title="How To Use"
+            [class.active]="activePanel === 'howto'"
+            (click)="setPanel('howto')"
           >
-            <fa-icon [icon]="faLink"></fa-icon>
-          </button>
-        </ng-container>
-
-        <ng-template #connectedSpreadsheetTpl>
-          <div class="mm-pill mm-toolbar-pill">
-            <fa-icon [icon]="oneDriveSpreadsheetName ? faCloud : faFileExcel" class="me-2"></fa-icon>
-
-            <a href="#" (click)="downloadSpreadsheet($event)">{{ connectedSpreadsheetName }}</a>
-
-            <span *ngIf="mergeFile && !oneDriveSpreadsheetName" class="mm-muted">
-              ({{ (mergeFile.size / 1024).toFixed(1) }} KB)
-            </span>
-
-            <span *ngIf="oneDriveSpreadsheetName" class="mm-badge">OneDrive</span>
-
-            <button type="button" class="mm-icon-btn" title="Remove spreadsheet" (click)="removeSpreadsheet()">
-              <fa-icon [icon]="faTrash"></fa-icon>
-            </button>
-          </div>
-        </ng-template>
-      </div>
-
-      <!-- 3) Formatting -->
-      <div class="mm-toolbar-seg mm-toolbar-format">
-        <button type="button" class="mm-icon-btn" title="Bold" (mousedown)="formatFromToolbar($event, 'bold')"><b>B</b></button>
-        <button type="button" class="mm-icon-btn" title="Italic" (mousedown)="formatFromToolbar($event, 'italic')"><i>I</i></button>
-        <button type="button" class="mm-icon-btn" title="Underline" (mousedown)="formatFromToolbar($event, 'underline')"><u>U</u></button>
-
-        <button type="button" class="mm-icon-btn" title="Attachments" (click)="openAttachmentsPicker()">
-          <fa-icon [icon]="faPaperclip"></fa-icon>
-        </button>
-      </div>
-
-      <!-- 4) Right tools -->
-      <div class="mm-toolbar-seg mm-toolbar-tools">
-        <!-- ✅ Compose -->
-        <button
-          type="button"
-          class="mm-btn"
-          title="Compose"
-          [class.active]="activePanel === 'compose'"
-          (click)="setPanel('compose')"
-        >
-          <fa-icon class="me-2" [icon]="faCompose"></fa-icon>
-        </button>
-
-        <button
-          type="button"
-          class="mm-btn"
-          title="How To Use"
-          [class.active]="activePanel === 'howto'"
-          (click)="setPanel('howto')"
-        >
-          <fa-icon class="me-2" [icon]="faHowTo"></fa-icon>
-        </button>
-
-        <button
-          type="button"
-          class="mm-btn"
-          title="View Spreadsheet"
-          [class.active]="activePanel === 'sheet'"
-          (click)="setPanel('sheet')"
-        >
-          <fa-icon class="me-2" [icon]="faSpreadsheet"></fa-icon>
-        </button>
-
-        <button
-          type="button"
-          class="mm-btn"
-          title="AI Improvement"
-          [class.active]="activePanel === 'ai'"
-          (click)="setPanel('ai')"
-        >
-          <fa-icon class="me-2" [icon]="faAi"></fa-icon>
-        </button>
-
-        <button
-          type="button"
-          class="mm-btn"
-          title="Preview"
-          [class.active]="activePanel === 'preview'"
-          (click)="setPanel('preview')"
-        >
-          <fa-icon class="me-2" [icon]="faPreview"></fa-icon>
-        </button>
-      </div>
-    </div>
-
-    <!-- Optional: OneDrive error row ONLY -->
-    <div class="mm-subrow">
-      <div class="mm-subrow-left">
-        <div *ngIf="oneDriveError" class="mm-error">{{ oneDriveError }}</div>
-      </div>
-    </div>
-
-    <!-- OneDrive picker -->
-    <div *ngIf="oneDrivePickerVisible" class="mm-onedrive-picker">
-      <div class="mm-onedrive-header">
-        <strong>Select a spreadsheet from your OneDrive</strong>
-        <button type="button" class="mm-link" (click)="closeOneDrivePicker()">✕ Close</button>
-      </div>
-
-      <div *ngIf="oneDriveLoading" class="mm-muted">Loading OneDrive files…</div>
-
-      <ul class="list-group" *ngIf="!oneDriveLoading && oneDriveFiles?.length">
-        <li *ngFor="let f of oneDriveFiles" class="list-group-item d-flex justify-content-between align-items-center">
-          <div>
-            <fa-icon [icon]="faFileExcel" class="text-success me-2"></fa-icon>
-            <span>{{ f.name }}</span>
-          </div>
-          <button type="button" class="mm-btn" (click)="selectOneDriveFile(f)">Use this</button>
-        </li>
-      </ul>
-
-      <div *ngIf="!oneDriveLoading && !oneDriveFiles?.length && !oneDriveError" class="mm-muted">
-        No spreadsheets found in your OneDrive root.
-      </div>
-    </div>
-
-    <!-- B) MERGE FIELDS ROW (conditional) -->
-    <div *ngIf="spreadsheetHeaders?.length" class="mm-merge-fields-row">
-      <div class="mm-merge-fields-scroll">
-        <span
-          *ngFor="let header of spreadsheetHeaders"
-          class="mm-merge-field"
-          draggable="true"
-          (dragstart)="onDragStart($event, header)"
-          [style.background]="getColorForField(header)"
-        >
-          {{ header }}
-        </span>
-      </div>
-    </div>
-
-    <!-- C) SEND/SAVE + PROGRESS ROW -->
-    <div class="mm-action-row">
-      <div class="mm-action-left">
-        <div class="mm-dropdown">
-          <button type="button" class="mm-btn" (click)="toggleSendMenu()" [disabled]="!projectId">
-            Send / Save
-            <span class="mm-caret">▾</span>
+            <fa-icon class="me-2" [icon]="faHowTo"></fa-icon>
           </button>
 
-          <div class="mm-menu" *ngIf="sendMenuOpen">
-            <button type="button" class="mm-menu-item" (click)="saveProject(); sendMenuOpen=false" [disabled]="saving">
-              Save
-            </button>
-
-            <!-- ✅ NEW: Test -->
-            <button
-              type="button"
-              class="mm-menu-item"
-              (click)="testProject(); sendMenuOpen=false"
-              [disabled]="testSending() || mergeSending() || saving"
-            >
-              Test
-            </button>
-
-            <button
-              type="button"
-              class="mm-menu-item"
-              (click)="queueSendProject(); sendMenuOpen=false"
-              [disabled]="mergeSending() || sendQueued()"
-            >
-              Send
-            </button>
-          </div>
-        </div>
-
-        <div class="mm-status-inline">
-          <span *ngIf="sendQueued()" class="mm-warn">
-          ⏳ Sending in {{ sendQueuedSeconds() }}s
-          <button type="button" class="mm-link" (click)="undoQueuedSend()">Undo</button>
-          </span>
-          <span *ngIf="saveSuccess" class="mm-ok">✅ Saved</span>
-          <span *ngIf="testSuccess" class="mm-ok">✅ Test sent</span>
-          <span *ngIf="sendSuccess" class="mm-ok">✅ Sent</span>
-
-          <span *ngIf="testErr()" class="mm-bad">❌ Test failed</span>
-          <span *ngIf="mergeErr()" class="mm-bad">❌ Mail merge failed</span>
-        </div>
-      </div>
-
-      <div class="mm-action-right" *ngIf="sendingInProgress">
-        <div class="progress mm-progress">
-          <div
-            class="progress-bar"
-            role="progressbar"
-            [class.progress-bar-striped]="sendingTotal === 0"
-            [class.progress-bar-animated]="sendingTotal === 0"
-            [style.width.%]="sendingTotal > 0 ? (sendingProgress / sendingTotal) * 100 : 100"
+          <button
+            type="button"
+            class="mm-btn"
+            title="View Spreadsheet"
+            [class.active]="activePanel === 'sheet'"
+            (click)="setPanel('sheet')"
           >
-            <ng-container *ngIf="sendingTotal > 0; else startingTpl">
-              {{ sendingProgress }} / {{ sendingTotal }}
-            </ng-container>
-            <ng-template #startingTpl>Sending…</ng-template>
-          </div>
-        </div>
-      </div>
-    </div>
+            <fa-icon class="me-2" [icon]="faSpreadsheet"></fa-icon>
+          </button>
 
-    <!-- ✅ D) COMPOSE (only when activePanel === 'compose') -->
-    <form *ngIf="activePanel === 'compose'" #mergeForm="ngForm" novalidate class="mm-form">
-      <div class="mm-compose">
-        <!-- TO -->
-        <div class="mm-compose-row">
-          <div class="mm-compose-label">To</div>
+          <button type="button" class="mm-btn" title="AI Improvement" [class.active]="activePanel === 'ai'" (click)="setPanel('ai')">
+            <fa-icon class="me-2" [icon]="faAi"></fa-icon>
+          </button>
 
-          <div
-            id="toField"
-            class="mm-line-editor"
-            contenteditable="true"
-            (drop)="onDrop($event, 'to')"
-            (dragover)="allowDrop($event)"
-            (input)="onEditorInput('to')"
-          ></div>
+          <button
+            type="button"
+            class="mm-btn"
+            title="Preview"
+            [class.active]="activePanel === 'preview'"
+            (click)="setPanel('preview')"
+          >
+            <fa-icon class="me-2" [icon]="faPreview"></fa-icon>
+          </button>
 
-          <button type="button" class="mm-link-btn" (click)="toggleBcc()">
-            {{ showBcc ? 'Hide Bcc' : 'Bcc' }}
+          <button type="button" class="mm-btn" title="Signature" (click)="toggleSignaturePanel()">
+            <fa-icon class="me-2" [icon]="faSignature"></fa-icon>
           </button>
         </div>
+      </div>
 
-        <!-- CC -->
-        <div class="mm-compose-row">
-          <div class="mm-compose-label">Cc</div>
-
-          <div
-            id="ccField"
-            class="mm-line-editor"
-            contenteditable="true"
-            (drop)="onDrop($event, 'cc')"
-            (dragover)="allowDrop($event)"
-            (input)="onEditorInput('cc')"
-          ></div>
-        </div>
-
-        <!-- BCC -->
-        <div class="mm-compose-row" *ngIf="showBcc">
-          <div class="mm-compose-label">Bcc</div>
-
-          <div
-            id="bccField"
-            class="mm-line-editor"
-            contenteditable="true"
-            (drop)="onDrop($event, 'bcc')"
-            (dragover)="allowDrop($event)"
-            (input)="onEditorInput('bcc')"
-          ></div>
-        </div>
-
-        <!-- SUBJECT -->
-        <div class="mm-compose-row">
-          <div class="mm-compose-label"></div>
-
-          <div
-            id="mergeSubject"
-            class="mm-line-editor"
-            contenteditable="true"
-            data-placeholder="Add a subject"
-            (drop)="onDrop($event, 'subject')"
-            (dragover)="allowDrop($event)"
-            (input)="onEditorInput('subject')"
-          ></div>
-        </div>
-
-        <!-- BODY -->
-        <div class="mm-compose-body">
-          <div
-            id="mergeBody"
-            name="mergeBody"
-            class="mm-body-editor"
-            contenteditable="true"
-            data-placeholder="Type here to write your mailmerge"
-            (drop)="onDrop($event, 'body')"
-            (dragover)="allowDrop($event)"
-            (input)="onEditorInput('body')"
-          ></div>
+      <!-- Optional: OneDrive error row ONLY -->
+      <div class="mm-subrow">
+        <div class="mm-subrow-left">
+          <div *ngIf="oneDriveError" class="mm-error">{{ oneDriveError }}</div>
         </div>
       </div>
 
-      <!-- Attachments list -->
-      <div class="mm-attachments" *ngIf="attachments.length">
-        <div class="mm-attachments-title">Attachments</div>
-        <ul class="list-unstyled mb-0">
-          <li *ngFor="let a of attachments; let i = index" class="mm-attachment-item">
-            <a href="#" (click)="downloadAttachment(a, $event)">{{ a.name }} ({{ (a.size / 1024).toFixed(1) }} KB)</a>
-            <button type="button" class="mm-link-danger" (click)="removeAttachment(i)">Remove</button>
+      <!-- OneDrive picker -->
+      <div *ngIf="oneDrivePickerVisible" class="mm-onedrive-picker">
+        <div class="mm-onedrive-header">
+          <strong>Select a spreadsheet from your OneDrive</strong>
+          <button type="button" class="mm-link" (click)="closeOneDrivePicker()">✕ Close</button>
+        </div>
+
+        <div *ngIf="oneDriveLoading" class="mm-muted">Loading OneDrive files…</div>
+
+        <ul class="list-group" *ngIf="!oneDriveLoading && oneDriveFiles?.length">
+          <li *ngFor="let f of oneDriveFiles" class="list-group-item d-flex justify-content-between align-items-center">
+            <div>
+              <fa-icon [icon]="faFileExcel" class="text-success me-2"></fa-icon>
+              <span>{{ f.name }}</span>
+            </div>
+            <button type="button" class="mm-btn" (click)="selectOneDriveFile(f)">Use this</button>
           </li>
         </ul>
-      </div>
-    </form>
 
-    <!-- ✅ Right-side panels (only one at a time) -->
-    <section class="mm-panels" *ngIf="activePanel !== 'compose'">
-      <!-- HOW TO -->
-      <div *ngIf="activePanel === 'howto'" class="mm-panel">
-        <h4>How to use MailMerge</h4>
-        <p class="mm-muted">
-          1️⃣ Upload an Excel file with a header row — must include a column named <code>email</code>.<br /><br />
-          2️⃣ Use placeholders like <code>{{'{{name}}'}}</code> or <code>{{'{{course}}'}}</code>.<br /><br />
-          3️⃣ Click <strong>Preview</strong> to see personalized emails.<br /><br />
-          4️⃣ Click <strong>Send</strong> to send them all.
-        </p>
+        <div *ngIf="!oneDriveLoading && !oneDriveFiles?.length && !oneDriveError" class="mm-muted">
+          No spreadsheets found in your OneDrive root.
+        </div>
       </div>
 
-      <!-- SHEET -->
-      <div *ngIf="activePanel === 'sheet' && spreadsheetTable && spreadsheetTable.length" class="mm-panel">
-        <h4>Spreadsheet Preview</h4>
-        <table class="table table-bordered table-sm mt-2">
-          <thead>
-          <tr>
-            <th *ngFor="let h of spreadsheetTable[0]">{{ h }}</th>
-          </tr>
-          </thead>
-          <tbody>
-          <tr *ngFor="let row of spreadsheetTable.slice(1)">
-            <td *ngFor="let cell of row">{{ cell }}</td>
-          </tr>
-          </tbody>
-        </table>
-      </div>
-
-      <!-- AI -->
-      <div *ngIf="activePanel === 'ai'" class="mm-panel">
-        <h4 class="mb-3">Select Your Tone</h4>
-
-        <div class="d-flex gap-3 mb-3 flex-wrap">
-          <button class="mm-btn" (click)="rewriteEmailBody('professional')" [disabled]="isRewriting || !mergeBodyTemplate">
-            ✨ Professional
-          </button>
-          <button class="mm-btn" (click)="rewriteEmailBody('friendly')" [disabled]="isRewriting || !mergeBodyTemplate">
-            🙂 Friendly
-          </button>
-          <button
-            class="mm-btn"
-            (click)="rewriteEmailBody('custom')"
-            [disabled]="isRewriting || !mergeBodyTemplate || !customTone"
+      <!-- B) MERGE FIELDS ROW (conditional) -->
+      <div *ngIf="spreadsheetHeaders?.length" class="mm-merge-fields-row">
+        <div class="mm-merge-fields-scroll">
+          <span
+            *ngFor="let header of spreadsheetHeaders"
+            class="mm-merge-field"
+            draggable="true"
+            (dragstart)="onDragStart($event, header)"
+            [style.background]="getColorForField(header)"
           >
-            🎯 Custom
-          </button>
-        </div>
-
-        <input
-          type="text"
-          class="form-control mb-3"
-          [(ngModel)]="customTone"
-          name="customTone"
-          placeholder="e.g. more concise, persuasive, motivational..."
-          style="max-width: 420px;"
-        />
-
-        <div *ngIf="aiRewrittenText && !isRewriting" class="mm-ai-preview">
-          <h5>Suggested Rewrite</h5>
-          <div class="mm-ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
-          <button class="mm-btn mt-2" (click)="applyRewrittenEmail()">✅ Use This Email</button>
+            {{ header }}
+          </span>
         </div>
       </div>
 
-      <!-- PREVIEW -->
-      <div *ngIf="activePanel === 'preview' && previewEmails.length > 0" class="mm-panel">
-        <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
-        <div class="mm-preview-list">
-          <div *ngFor="let email of previewEmails" class="mm-preview-item">
-            <div class="mm-email-header">
-              <div><strong>To:</strong> {{ email.to }}</div>
-              <div *ngIf="email.cc"><strong>CC:</strong> {{ email.cc }}</div>
-              <div *ngIf="email.bcc"><strong>BCC:</strong> {{ email.bcc }}</div>
-              <div><strong>Subject:</strong> {{ email.subject }}</div>
-              <span class="mm-email-date">Now</span>
-            </div>
+      <!-- C) SEND/SAVE + PROGRESS ROW -->
+      <div class="mm-action-row">
+        <div class="mm-action-left">
+          <div class="mm-dropdown">
+            <button type="button" class="mm-btn" (click)="toggleSendMenu()" [disabled]="!projectId">
+              Send / Save
+              <span class="mm-caret">▾</span>
+            </button>
 
-            <div class="mm-email-body mt-2">
-              <div [innerHTML]="email.body"></div>
-            </div>
+            <div class="mm-menu" *ngIf="sendMenuOpen">
+              <button type="button" class="mm-menu-item" (click)="saveProject(); sendMenuOpen=false" [disabled]="saving">Save</button>
 
-            <div *ngIf="email.attachments?.length" class="mm-preview-attachments mt-2">
-              <strong>Attachments:</strong>
-              <ul class="list-unstyled mt-1 mb-0">
-                <li *ngFor="let file of email.attachments" class="mm-attachment-chip">
-                  📎 {{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)
-                </li>
-              </ul>
+              <button
+                type="button"
+                class="mm-menu-item"
+                (click)="testProject(); sendMenuOpen=false"
+                [disabled]="testSending() || mergeSending() || saving"
+              >
+                Test
+              </button>
+
+              <button
+                type="button"
+                class="mm-menu-item"
+                (click)="queueSendProject(); sendMenuOpen=false"
+                [disabled]="mergeSending() || sendQueued()"
+              >
+                Send
+              </button>
+            </div>
+          </div>
+
+          <div class="mm-status-inline">
+            <span *ngIf="sendQueued()" class="mm-warn">
+              ⏳ Sending in {{ sendQueuedSeconds() }}s
+              <button type="button" class="mm-link" (click)="undoQueuedSend()">Undo</button>
+            </span>
+            <span *ngIf="saveSuccess" class="mm-ok">✅ Saved</span>
+            <span *ngIf="testSuccess" class="mm-ok">✅ Test sent</span>
+            <span *ngIf="sendSuccess" class="mm-ok">✅ Sent</span>
+
+            <span *ngIf="testErr()" class="mm-bad">❌ Test failed</span>
+            <span *ngIf="mergeErr()" class="mm-bad">❌ Mail merge failed</span>
+          </div>
+        </div>
+
+        <div class="mm-action-right" *ngIf="sendingInProgress">
+          <div class="progress mm-progress">
+            <div
+              class="progress-bar"
+              role="progressbar"
+              [class.progress-bar-striped]="sendingTotal === 0"
+              [class.progress-bar-animated]="sendingTotal === 0"
+              [style.width.%]="sendingTotal > 0 ? (sendingProgress / sendingTotal) * 100 : 100"
+            >
+              <ng-container *ngIf="sendingTotal > 0; else startingTpl">
+                {{ sendingProgress }} / {{ sendingTotal }}
+              </ng-container>
+              <ng-template #startingTpl>Sending…</ng-template>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- empty states -->
-      <div *ngIf="activePanel === 'preview' && previewEmails.length === 0" class="mm-panel">
-        <h4 class="mb-2">Email Preview</h4>
-        <div class="mm-muted">No preview available yet. Connect a spreadsheet first.</div>
+      <!-- ✅ D) COMPOSE -->
+      <form *ngIf="activePanel === 'compose'" #mergeForm="ngForm" novalidate class="mm-form">
+        <div class="mm-compose">
+          <!-- TO -->
+          <div class="mm-compose-row">
+            <div class="mm-compose-label">To</div>
+
+            <div
+              id="toField"
+              class="mm-line-editor"
+              contenteditable="true"
+              (drop)="onDrop($event, 'to')"
+              (dragover)="allowDrop($event)"
+              (input)="onEditorInput('to')"
+            ></div>
+
+            <button type="button" class="mm-link-btn" (click)="toggleBcc()">
+              {{ showBcc ? 'Hide Bcc' : 'Bcc' }}
+            </button>
+          </div>
+
+          <!-- CC -->
+          <div class="mm-compose-row">
+            <div class="mm-compose-label">Cc</div>
+
+            <div
+              id="ccField"
+              class="mm-line-editor"
+              contenteditable="true"
+              (drop)="onDrop($event, 'cc')"
+              (dragover)="allowDrop($event)"
+              (input)="onEditorInput('cc')"
+            ></div>
+          </div>
+
+          <!-- BCC -->
+          <div class="mm-compose-row" *ngIf="showBcc">
+            <div class="mm-compose-label">Bcc</div>
+
+            <div
+              id="bccField"
+              class="mm-line-editor"
+              contenteditable="true"
+              (drop)="onDrop($event, 'bcc')"
+              (dragover)="allowDrop($event)"
+              (input)="onEditorInput('bcc')"
+            ></div>
+          </div>
+
+          <!-- SUBJECT -->
+          <div class="mm-compose-row">
+            <div class="mm-compose-label"></div>
+
+            <div
+              id="mergeSubject"
+              class="mm-line-editor"
+              contenteditable="true"
+              data-placeholder="Add a subject"
+              (drop)="onDrop($event, 'subject')"
+              (dragover)="allowDrop($event)"
+              (input)="onEditorInput('subject')"
+            ></div>
+          </div>
+
+          <!-- BODY -->
+          <div class="mm-compose-body">
+            <div
+              id="mergeBody"
+              class="mm-body-editor"
+              contenteditable="true"
+              data-placeholder="Type here to write your mailmerge"
+              (paste)="onEditorPaste($event, 'body')"
+              (drop)="onDrop($event, 'body')"
+              (dragover)="allowDrop($event)"
+              (input)="onEditorInput('body')"
+            ></div>
+          </div>
+        </div>
+
+        <!-- Attachments list -->
+        <div class="mm-attachments" *ngIf="attachments.length">
+          <div class="mm-attachments-title">Attachments</div>
+          <ul class="list-unstyled mb-0">
+            <li *ngFor="let a of attachments; let i = index" class="mm-attachment-item">
+              <a href="#" (click)="downloadAttachment(a, $event)">{{ a.name }} ({{ (a.size / 1024).toFixed(1) }} KB)</a>
+              <button type="button" class="mm-link-danger" (click)="removeAttachment(i)">Remove</button>
+            </li>
+          </ul>
+        </div>
+      </form>
+
+      <!-- Signature -->
+      <div *ngIf="signaturePanelOpen" class="mm-signature-panel mt-2">
+        <div class="mm-muted mb-2">Paste or type your signature below</div>
+
+        <div
+          id="signatureEditor"
+          class="mm-body-editor"
+          contenteditable="true"
+          data-placeholder="e.g. Regards, John..."
+          (paste)="onEditorPaste($event, 'signature')"
+          (input)="onSignatureInput()"
+        ></div>
+
+        <div class="d-flex gap-2 mt-2 flex-wrap">
+          <button type="button" class="mm-btn" (click)="saveSignature()">Save</button>
+          <button type="button" class="mm-link" (click)="signaturePanelOpen = false">Cancel</button>
+        </div>
       </div>
 
-      <div *ngIf="activePanel === 'sheet' && (!spreadsheetTable || !spreadsheetTable.length)" class="mm-panel">
-        <h4 class="mb-2">Spreadsheet Preview</h4>
-        <div class="mm-muted">No spreadsheet connected yet.</div>
+      <!-- ✅ Right-side panels (only one at a time) -->
+      <section class="mm-panels" *ngIf="activePanel !== 'compose'">
+        <!-- HOW TO -->
+        <div *ngIf="activePanel === 'howto'" class="mm-panel">
+          <h4>How to use MailMerge</h4>
+          <p class="mm-muted">
+            1️⃣ Upload an Excel file with a header row — must include a column named <code>email</code>.<br /><br />
+            2️⃣ Use placeholders like <code>{{'{{name}}'}}</code> or <code>{{'{{course}}'}}</code>.<br /><br />
+            3️⃣ Click <strong>Preview</strong> to see personalized emails.<br /><br />
+            4️⃣ Click <strong>Send</strong> to send them all.
+          </p>
+        </div>
+
+        <!-- SHEET -->
+        <div *ngIf="activePanel === 'sheet' && spreadsheetTable && spreadsheetTable.length" class="mm-panel">
+          <h4>Spreadsheet Preview</h4>
+          <table class="table table-bordered table-sm mt-2">
+            <thead>
+            <tr>
+              <th *ngFor="let h of spreadsheetTable[0]">{{ h }}</th>
+            </tr>
+            </thead>
+            <tbody>
+            <tr *ngFor="let row of spreadsheetTable.slice(1)">
+              <td *ngFor="let cell of row">{{ cell }}</td>
+            </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- AI -->
+        <div *ngIf="activePanel === 'ai'" class="mm-panel">
+          <h4 class="mb-3">Select Your Tone</h4>
+
+          <div class="d-flex gap-3 mb-3 flex-wrap">
+            <button class="mm-btn" (click)="rewriteEmailBody('professional')" [disabled]="isRewriting || !mergeBodyTemplate">
+              ✨ Professional
+            </button>
+            <button class="mm-btn" (click)="rewriteEmailBody('friendly')" [disabled]="isRewriting || !mergeBodyTemplate">
+              🙂 Friendly
+            </button>
+            <button class="mm-btn" (click)="rewriteEmailBody('custom')" [disabled]="isRewriting || !mergeBodyTemplate || !customTone">
+              🎯 Custom
+            </button>
+          </div>
+
+          <input
+            type="text"
+            class="form-control mb-3"
+            [(ngModel)]="customTone"
+            name="customTone"
+            placeholder="e.g. more concise, persuasive, motivational..."
+            style="max-width: 420px;"
+          />
+
+          <div *ngIf="aiRewrittenText && !isRewriting" class="mm-ai-preview">
+            <h5>Suggested Rewrite</h5>
+            <div class="mm-ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
+            <button class="mm-btn mt-2" (click)="applyRewrittenEmail()">✅ Use This Email</button>
+          </div>
+        </div>
+
+        <!-- PREVIEW -->
+        <div *ngIf="activePanel === 'preview' && previewEmails.length > 0" class="mm-panel">
+          <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
+          <div class="mm-preview-list">
+            <div *ngFor="let email of previewEmails" class="mm-preview-item">
+              <div class="mm-email-header">
+                <div><strong>To:</strong> {{ email.to }}</div>
+                <div *ngIf="email.cc"><strong>CC:</strong> {{ email.cc }}</div>
+                <div *ngIf="email.bcc"><strong>BCC:</strong> {{ email.bcc }}</div>
+                <div><strong>Subject:</strong> {{ email.subject }}</div>
+                <span class="mm-email-date">Now</span>
+              </div>
+
+              <div class="mm-email-body mt-2">
+                <div [innerHTML]="email.body"></div>
+              </div>
+
+              <div *ngIf="email.attachments?.length" class="mm-preview-attachments mt-2">
+                <strong>Attachments:</strong>
+                <ul class="list-unstyled mt-1 mb-0">
+                  <li *ngFor="let file of email.attachments" class="mm-attachment-chip">
+                    📎 {{ file.name }} ({{ (file.size / 1024).toFixed(1) }} KB)
+                  </li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- empty states -->
+        <div *ngIf="activePanel === 'preview' && previewEmails.length === 0" class="mm-panel">
+          <h4 class="mb-2">Email Preview</h4>
+          <div class="mm-muted">No preview available yet. Connect a spreadsheet first.</div>
+        </div>
+
+        <div *ngIf="activePanel === 'sheet' && (!spreadsheetTable || !spreadsheetTable.length)" class="mm-panel">
+          <h4 class="mb-2">Spreadsheet Preview</h4>
+          <div class="mm-muted">No spreadsheet connected yet.</div>
+        </div>
+      </section>
+    </ng-container>
+
+    <ng-template #noProjectSelectedTpl>
+      <!-- “Blank” RHS state (you can style this to be fully empty if you prefer) -->
+      <div class="mm-panel" style="height: 100%; display: flex; align-items: center; justify-content: center;">
+        <div style="text-align: center; max-width: 520px;">
+          <h4 style="margin-bottom: 8px;">Select or create a project</h4>
+          <div class="mm-muted">Use the Projects sidebar on the left to get started.</div>
+        </div>
       </div>
-    </section>
+    </ng-template>
   </main>
 </div>

@@ -1,0 +1,18 @@
+<databaseChangeLog xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+                   xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+                   xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                   http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.24.xsd">
+
+  <changeSet id="20251220120000-1" author="you">
+    <addColumn tableName="project">
+      <column name="spreadsheet_name" type="varchar(255)"/>
+    </addColumn>
+  </changeSet>
+
+  <changeSet id="20251220120000-2" author="you">
+    <addColumn tableName="jhi_user">
+      <column name="email_signature" type="clob"/>
+    </addColumn>
+  </changeSet>
+
+</databaseChangeLog>

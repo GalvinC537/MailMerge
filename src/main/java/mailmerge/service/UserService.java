@@ -10,6 +10,7 @@ import mailmerge.repository.AuthorityRepository;
 import mailmerge.repository.UserRepository;
 import mailmerge.security.SecurityUtils;
 import mailmerge.service.dto.AdminUserDTO;
+import mailmerge.service.dto.PublicUserDTO;
 import mailmerge.service.dto.UserDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,14 +71,34 @@ public class UserService {
             });
     }
 
+    /**
+     * Update ONLY the current user's email signature (HTML/Text).
+     */
+    public void updateEmailSignature(String emailSignature) {
+        SecurityUtils.getCurrentUserLogin()
+            .flatMap(userRepository::findOneByLogin)
+            .ifPresent(user -> {
+                user.setEmailSignature(emailSignature);
+                userRepository.save(user);
+                this.clearUserCaches(user);
+                LOG.debug("Changed email signature for User: {}", user.getLogin());
+            });
+    }
+
     @Transactional(readOnly = true)
     public Page<AdminUserDTO> getAllManagedUsers(Pageable pageable) {
         return userRepository.findAll(pageable).map(AdminUserDTO::new);
     }
 
+    /**
+     * Public endpoint backing: returns ONLY public fields (id + login).
+     * This prevents leaking private data like emailSignature in /api/users.
+     */
     @Transactional(readOnly = true)
-    public Page<UserDTO> getAllPublicUsers(Pageable pageable) {
-        return userRepository.findAllByIdNotNullAndActivatedIsTrue(pageable).map(UserDTO::new);
+    public Page<PublicUserDTO> getAllPublicUsers(Pageable pageable) {
+        return userRepository
+            .findAllByIdNotNullAndActivatedIsTrue(pageable)
+            .map(user -> new PublicUserDTO(user.getId(), user.getLogin()));
     }
 
     @Transactional(readOnly = true)
@@ -94,10 +115,15 @@ public class UserService {
         return authorityRepository.findAll().stream().map(Authority::getName).toList();
     }
 
-    private User syncUserWithIdP(Map<String, Object> details, User user) {
-        // save authorities in to sync user roles/groups between IdP and JHipster's local database
+    /**
+     * IMPORTANT CHANGE:
+     * Return the *persisted* user (existing user from DB) so fields like emailSignature are not lost
+     * when building AdminUserDTO for /api/account.
+     */
+    private User syncUserWithIdP(Map<String, Object> details, User userFromIdP) {
+        // Save authorities in local DB if needed
         Collection<String> dbAuthorities = getAuthorities();
-        Collection<String> userAuthorities = user.getAuthorities().stream().map(Authority::getName).toList();
+        Collection<String> userAuthorities = userFromIdP.getAuthorities().stream().map(Authority::getName).toList();
         for (String authority : userAuthorities) {
             if (!dbAuthorities.contains(authority)) {
                 LOG.debug("Saving authority '{}' in local database", authority);
@@ -106,33 +132,46 @@ public class UserService {
                 authorityRepository.save(authorityToSave);
             }
         }
-        // save account in to sync users between IdP and JHipster's local database
-        Optional<User> existingUser = userRepository.findOneByLogin(user.getLogin());
-        if (existingUser.isPresent()) {
-            // if IdP sends last updated information, use it to determine if an update should happen
+
+        User existing = userRepository.findOneByLogin(userFromIdP.getLogin()).orElse(null);
+
+        if (existing != null) {
+            // If IdP sends updated_at, only update local profile fields when IdP is newer
+            boolean shouldUpdate = true;
             if (details.get("updated_at") != null) {
-                Instant dbModifiedDate = existingUser.orElseThrow().getLastModifiedDate();
+                Instant dbModifiedDate = existing.getLastModifiedDate();
                 Instant idpModifiedDate;
                 if (details.get("updated_at") instanceof Instant) {
                     idpModifiedDate = (Instant) details.get("updated_at");
                 } else {
                     idpModifiedDate = Instant.ofEpochSecond((Integer) details.get("updated_at"));
                 }
-                if (idpModifiedDate.isAfter(dbModifiedDate)) {
-                    LOG.debug("Updating user '{}' in local database", user.getLogin());
-                    updateUser(user.getFirstName(), user.getLastName(), user.getEmail(), user.getLangKey(), user.getImageUrl());
-                }
-                // no last updated info, blindly update
-            } else {
-                LOG.debug("Updating user '{}' in local database", user.getLogin());
-                updateUser(user.getFirstName(), user.getLastName(), user.getEmail(), user.getLangKey(), user.getImageUrl());
+                shouldUpdate = dbModifiedDate == null || idpModifiedDate.isAfter(dbModifiedDate);
             }
+
+            if (shouldUpdate) {
+                LOG.debug("Updating user '{}' in local database", existing.getLogin());
+                existing.setFirstName(userFromIdP.getFirstName());
+                existing.setLastName(userFromIdP.getLastName());
+                existing.setEmail(userFromIdP.getEmail() != null ? userFromIdP.getEmail().toLowerCase() : null);
+                existing.setLangKey(userFromIdP.getLangKey());
+                existing.setImageUrl(userFromIdP.getImageUrl());
+                existing.setActivated(userFromIdP.isActivated());
+            }
+
+            // Always keep authorities in sync
+            existing.setAuthorities(userFromIdP.getAuthorities());
+
+            userRepository.save(existing);
+            this.clearUserCaches(existing);
+
+            return existing;
         } else {
-            LOG.debug("Saving user '{}' in local database", user.getLogin());
-            userRepository.save(user);
-            this.clearUserCaches(user);
+            LOG.debug("Saving user '{}' in local database", userFromIdP.getLogin());
+            userRepository.save(userFromIdP);
+            this.clearUserCaches(userFromIdP);
+            return userFromIdP;
         }
-        return user;
     }
 
     /**
@@ -152,6 +191,7 @@ public class UserService {
         } else {
             throw new IllegalArgumentException("AuthenticationToken is not OAuth2 or JWT!");
         }
+
         User user = getUser(attributes);
         user.setAuthorities(
             authToken
@@ -166,7 +206,8 @@ public class UserService {
                 .collect(Collectors.toSet())
         );
 
-        return new AdminUserDTO(syncUserWithIdP(attributes, user));
+        User persisted = syncUserWithIdP(attributes, user);
+        return new AdminUserDTO(persisted);
     }
 
     private static User getUser(Map<String, Object> details) {

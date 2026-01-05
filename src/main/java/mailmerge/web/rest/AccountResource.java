@@ -7,9 +7,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.AbstractAuthenticationToken;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.http.ResponseEntity;
+import mailmerge.security.SecurityUtils;
 
 /**
  * REST controller for managing the current user's account.
@@ -52,6 +52,18 @@ public class AccountResource {
     }
 
     /**
+     * Update the current user's email signature (HTML/Text).
+     * Client sends JSON: { "emailSignature": "<p>Thanks...</p>" }
+     */
+    @PutMapping(value = "/account/email-signature", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public void updateEmailSignature(@RequestBody EmailSignatureVM body) {
+        LOG.debug("REST request to update current user's email signature");
+        userService.updateEmailSignature(body.emailSignature());
+    }
+
+    public record EmailSignatureVM(String emailSignature) {}
+
+    /**
      * {@code GET  /authenticate} : check if the user is authenticated, and return its login.
      *
      * @param principal the authentication principal.
@@ -61,5 +73,28 @@ public class AccountResource {
     public String isAuthenticated(Principal principal) {
         LOG.debug("REST request to check if the current user is authenticated");
         return principal == null ? null : principal.getName();
+    }
+
+    /**
+     * GET /account/signature : get the current user's email signature.
+     */
+    @GetMapping(value = "/account/signature", produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> getEmailSignature() {
+        return SecurityUtils
+            .getCurrentUserLogin()
+            .flatMap(userService::getUserWithAuthoritiesByLogin)
+            .map(user -> ResponseEntity.ok(user.getEmailSignature() == null ? "" : user.getEmailSignature()))
+            .orElse(ResponseEntity.notFound().build());
+    }
+
+    /**
+     * PUT /account/signature : update the current user's email signature.
+     * Client sends plain text in the request body.
+     */
+    @PutMapping(value = "/account/signature", consumes = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<Void> updateEmailSignaturePlain(@RequestBody String signature) {
+        LOG.debug("REST request to update current user's email signature");
+        userService.updateEmailSignature(signature);
+        return ResponseEntity.noContent().build();
     }
 }

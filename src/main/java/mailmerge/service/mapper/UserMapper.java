@@ -57,6 +57,12 @@ public class UserMapper {
             user.setLastModifiedDate(userDTO.getLastModifiedDate());
             user.setActivated(userDTO.isActivated());
             user.setLangKey(userDTO.getLangKey());
+
+            // ✅ NEW: if AdminUserDTO exposes it later, set it here too.
+            // If your AdminUserDTO doesn't have this field yet, leave this commented out.
+            // user.setEmailSignature(userDTO.getEmailSignature());
+            user.setEmailSignature(userDTO.getEmailSignature());
+
             Set<Authority> authorities = this.authoritiesFromStrings(userDTO.getAuthorities());
             user.setAuthorities(authorities);
             return user;
@@ -128,6 +134,10 @@ public class UserMapper {
         UserDTO userDto = new UserDTO();
         userDto.setId(user.getId());
         userDto.setLogin(user.getLogin());
+
+        // ✅ NEW: include signature when using login projection
+        userDto.setEmailSignature(user.getEmailSignature());
+
         return userDto;
     }
 

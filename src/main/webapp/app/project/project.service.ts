@@ -4,10 +4,16 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
+export type InlineImage = { cid: string; fileContentType: string; base64: string; name: string };
+
 export interface Project {
   id?: number;
   name: string;
+
   spreadsheetLink?: string | null;
+
+  // ✅ NEW: original spreadsheet filename (e.g. "scores.xlsx")
+  spreadsheetName?: string | null;
   header?: string;
   content?: string;
   status?: 'PENDING' | 'SENT' | 'FAILED';
@@ -73,6 +79,7 @@ export class ProjectService {
   sendMailMergeWithMeta(payload: {
     subjectTemplate: string;
     bodyTemplate: string;
+    inlineImages: InlineImage[];
     toTemplate: string;
     ccTemplate: string;
     bccTemplate: string;
@@ -87,6 +94,7 @@ export class ProjectService {
   sendMailMergeTestWithMeta(payload: {
     subjectTemplate: string;
     bodyTemplate: string;
+    inlineImages: InlineImage[];
     toTemplate: string;
     ccTemplate: string;
     bccTemplate: string;

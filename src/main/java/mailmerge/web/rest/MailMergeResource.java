@@ -28,6 +28,8 @@ public class MailMergeResource {
      *
      * Called from sendMailMergeWithMeta() in project.service.ts
      */
+    // MailMergeResource.java (only showing changed parts)
+
     @PostMapping("/send-advanced")
     public ResponseEntity<Void> sendMailMergeAdvanced(@RequestBody Map<String, Object> payload) {
         log.debug("REST request to send mail merge with full metadata");
@@ -39,8 +41,13 @@ public class MailMergeResource {
         String bccTemplate = (String) payload.get("bccTemplate");
         String spreadsheetBase64 = (String) payload.get("spreadsheet");
         String spreadsheetFileContentType = (String) payload.get("spreadsheetFileContentType");
+
         @SuppressWarnings("unchecked")
         List<Map<String, String>> attachments = (List<Map<String, String>>) payload.get("attachments");
+
+        // ✅ NEW
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> inlineImages = (List<Map<String, String>>) payload.get("inlineImages");
 
         try {
             mailMergeService.sendMailMergeAdvanced(
@@ -51,7 +58,8 @@ public class MailMergeResource {
                 bccTemplate,
                 spreadsheetBase64,
                 spreadsheetFileContentType,
-                attachments
+                attachments,
+                inlineImages // ✅ NEW
             );
             return ResponseEntity.ok().build();
         } catch (Exception e) {
@@ -60,11 +68,6 @@ public class MailMergeResource {
         }
     }
 
-    /**
-     * ✅ NEW endpoint: sends ONE "test" email to the currently logged-in user's email.
-     *
-     * Called from sendMailMergeTestWithMeta() in project.service.ts
-     */
     @PostMapping("/send-test")
     public ResponseEntity<Void> sendMailMergeTest(@RequestBody Map<String, Object> payload) {
         log.debug("REST request to send TEST mail merge");
@@ -76,8 +79,13 @@ public class MailMergeResource {
         String bccTemplate = (String) payload.get("bccTemplate");
         String spreadsheetBase64 = (String) payload.get("spreadsheet");
         String spreadsheetFileContentType = (String) payload.get("spreadsheetFileContentType");
+
         @SuppressWarnings("unchecked")
         List<Map<String, String>> attachments = (List<Map<String, String>>) payload.get("attachments");
+
+        // ✅ NEW
+        @SuppressWarnings("unchecked")
+        List<Map<String, String>> inlineImages = (List<Map<String, String>>) payload.get("inlineImages");
 
         try {
             mailMergeService.sendMailMergeAdvancedTest(
@@ -88,7 +96,8 @@ public class MailMergeResource {
                 bccTemplate,
                 spreadsheetBase64,
                 spreadsheetFileContentType,
-                attachments
+                attachments,
+                inlineImages // ✅ NEW
             );
             return ResponseEntity.ok().build();
         } catch (Exception e) {
