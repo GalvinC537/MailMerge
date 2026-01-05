@@ -5,14 +5,11 @@ import { UserRouteAccessService } from 'app/core/auth/user-route-access.service'
 import { errorRoute } from './layouts/error/error.route';
 
 const routes: Routes = [
-  // Home page — redirects logged-in users to /project
   {
     path: '',
     loadComponent: () => import('./home/home.component'),
     title: 'home.title',
   },
-
-  //  Project list page — shows user’s projects
 
   {
     path: 'project',
@@ -21,8 +18,15 @@ const routes: Routes = [
     data: { pageTitle: 'Projects' },
   },
 
-  //  Mail dashboard — open an existing project by its ID
+  // ✅ Mail dashboard "blank state" (no project selected)
+  {
+    path: 'mail',
+    canActivate: [UserRouteAccessService],
+    loadComponent: () => import('./mail-dashboard/mail-dashboard.component').then(m => m.MailDashboardComponent),
+    data: { pageTitle: 'Mail Dashboard' },
+  },
 
+  // ✅ Mail dashboard with selected project
   {
     path: 'mail/:id',
     canActivate: [UserRouteAccessService],
@@ -30,14 +34,24 @@ const routes: Routes = [
     data: { pageTitle: 'Mail Dashboard' },
   },
 
-  // Navbar outlet (for global navigation)
+  // ✅ Backwards-compat redirects (prevents 404 after login)
+  {
+    path: 'mail-dashboard',
+    redirectTo: 'mail',
+    pathMatch: 'full',
+  },
+  {
+    path: 'mail-dashboard/:id',
+    redirectTo: 'mail/:id',
+    pathMatch: 'full',
+  },
+
   {
     path: '',
     loadComponent: () => import('./layouts/navbar/navbar.component'),
     outlet: 'navbar',
   },
 
-  // Admin section
   {
     path: 'admin',
     data: { authorities: [Authority.ADMIN] },
@@ -45,20 +59,11 @@ const routes: Routes = [
     loadChildren: () => import('./admin/admin.routes'),
   },
 
-  // JHipster-generated entities (like Project, User, etc.)
   {
     path: '',
     loadChildren: () => import('./entities/entity.routes'),
   },
 
-  {
-    path: 'mail-dashboard',
-    canActivate: [UserRouteAccessService],
-    loadComponent: () => import('./mail-dashboard/mail-dashboard.component').then(m => m.MailDashboardComponent),
-    data: { pageTitle: 'Mail Dashboard' },
-  },
-
-  // Error routes (404, access denied, etc.)
   ...errorRoute,
 ];
 

@@ -23,6 +23,14 @@
   border-right: 1px solid var(--mm-border);
   padding: 14px 12px;
   min-width: 0;
+
+  /* ✅ NEW: nicer layout + contained scrolling */
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
 }
 
 /* When collapsed, tighten padding */
@@ -145,36 +153,79 @@
   color: var(--mm-muted);
   padding: 0 6px;
   margin-top: 10px;
+
+  /* ✅ NEW: sticky title */
+  position: sticky;
+  top: 0;
+  background: var(--mm-bg);
+  padding-top: 6px;
+  padding-bottom: 6px;
+  z-index: 2;
+}
+
+/* ✅ NEW: Search bar styling + sticky placement */
+.mm-project-search {
+  padding: 8px 10px 10px;
+
+  position: sticky;
+  top: 34px; /* sits under the sticky title */
+  background: var(--mm-bg);
+  z-index: 2;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.04);
+}
+
+.mm-project-search-input {
+  width: 100%;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  border-radius: 14px;
+  padding: 9px 10px;
+  font-size: 14px;
+  background: var(--mm-panel);
+  color: var(--mm-text);
+  outline: none;
+  transition: box-shadow 160ms ease, border-color 160ms ease, background-color 160ms ease;
+
+  &:focus {
+    box-shadow: var(--mm-focus);
+    border-color: rgba(0, 188, 212, 0.6);
+    background: #fff;
+  }
 }
 
 /* Projects list */
 .mm-projects-list {
-  overflow-y: auto;
+  /* ✅ CHANGED: stop each list from having its own scroll */
+  overflow-y: visible;
   padding-right: 2px;
-  margin-top: 6px;
+  margin-top: 8px;
+  margin-bottom: 4px;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
 }
 
 .mm-project-item {
   text-align: left;
   width: 100%;
-  border: 1px solid transparent;
-  background: transparent;
+
+  /* ✅ NEW: subtle card feel */
+  border: 1px solid rgba(0, 0, 0, 0.04);
+  background: rgba(255, 255, 255, 0);
+
   border-radius: 12px;
   padding: 10px 10px;
 
   display: grid;
   gap: 4px;
-  transition: background-color 160ms ease, border-color 160ms ease;
+  transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 
   &:hover {
-    background: var(--mm-hover);
+    background: #fff;
+    border-color: rgba(0, 0, 0, 0.08);
   }
 
   &.active {
-    background: var(--mm-primary-soft);
+    background: rgba(0, 188, 212, 0.12);
     border-color: rgba(0, 188, 212, 0.35);
   }
 
@@ -193,6 +244,21 @@
 .mm-project-meta {
   font-size: 0.85rem;
   color: var(--mm-muted);
+
+  /* ✅ NEW: status pill */
+  .mm-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.72rem;
+    font-weight: 900;
+    letter-spacing: 0.02em;
+    padding: 2px 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    background: var(--mm-panel);
+    text-transform: uppercase;
+  }
 }
 
 .mm-empty {
@@ -824,4 +890,99 @@
     width: 100%;
     max-width: 360px;
   }
+}
+
+/* =========================================================
+   Folder UI (your existing feature) — improved look
+   ========================================================= */
+
+.mm-folder {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  background: var(--mm-panel);
+  color: var(--mm-text);
+  padding: 10px 10px;
+  text-align: left;
+  cursor: pointer;
+  border-radius: 14px;
+  font-weight: 800;
+  transition: transform 120ms ease, box-shadow 160ms ease, background-color 160ms ease;
+
+  &:hover {
+    background: #fff;
+    box-shadow: 0 10px 22px rgba(0, 0, 0, 0.06);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+.mm-folder-caret {
+  width: 16px;
+  display: inline-flex;
+  justify-content: center;
+  opacity: 0.8;
+}
+
+.mm-folder-name {
+  flex: 1;
+  font-weight: 800;
+}
+
+.mm-folder-count {
+  font-size: 12px;
+  font-weight: 900;
+  color: var(--mm-text);
+  background: rgba(0, 188, 212, 0.14);
+  border: 1px solid rgba(0, 188, 212, 0.25);
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+.mm-folder-divider {
+  height: 1px;
+  background: var(--mm-border);
+  margin: 10px 8px;
+  opacity: 0.7;
+}
+
+/* Collapsed mode tweaks for folders + search */
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-search {
+  padding: 6px 0 10px;
+}
+
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-search-input {
+  padding: 9px 0;
+  text-align: center;
+}
+
+.mailmerge-shell.mm-sidebar-collapsed .mm-folder {
+  justify-content: center;
+  padding: 10px 0;
+}
+
+.mailmerge-shell.mm-sidebar-collapsed .mm-folder-name {
+  display: none;
+}
+
+.mailmerge-shell.mm-sidebar-collapsed .mm-folder-count {
+  margin-left: 0;
+}
+
+.mailmerge-shell.mm-sidebar-collapsed .mm-folder-caret {
+  display: none;
+}
+
+/* Optional: make collapsed active project feel "selected" */
+.mailmerge-shell.mm-sidebar-collapsed .mm-project-item.active {
+  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.22);
 }

@@ -15,6 +15,7 @@ import java.util.regex.Pattern;
 import mailmerge.domain.User;
 import mailmerge.repository.UserRepository;
 import mailmerge.security.SecurityUtils;
+import mailmerge.service.dto.InlineImageDTO;
 
 @Service
 public class MailMergeService {
@@ -42,8 +43,8 @@ public class MailMergeService {
         String bccTemplate,
         String spreadsheetBase64,
         String spreadsheetFileContentType,
-        List<Map<String, String>> attachments
-    ) throws Exception {
+        List<Map<String, String>> attachments,
+        List<Map<String, String>> inlineImages) throws Exception {
 
         if (spreadsheetBase64 == null || spreadsheetBase64.isEmpty()) {
             throw new IllegalArgumentException("Spreadsheet is missing");
@@ -66,8 +67,10 @@ public class MailMergeService {
             }
 
             // total rows (excluding header)
-            int totalCount = sheet.getLastRowNum();
+            int totalCount = Math.max(sheet.getPhysicalNumberOfRows() - 1, 0);
             int sentCount = 0;
+
+            List<InlineImageDTO> inlineList = buildInlineImages(inlineImages);
 
             while (iterator.hasNext()) {
                 Row row = iterator.next();
@@ -98,6 +101,7 @@ public class MailMergeService {
                 String subject = replace.apply(subjectTemplate);
                 String body = replace.apply(bodyTemplate);
 
+
                 if (to == null || to.trim().isEmpty()) {
                     log.warn("⚠️ Skipping row — missing 'to' address");
                     continue;
@@ -123,7 +127,7 @@ public class MailMergeService {
                     to, cc, bcc, subject, attachList.size());
 
                 // Do the actual send
-                boolean success = graphMailService.sendMail(to, cc, bcc, subject, body, attachList);
+                boolean success = graphMailService.sendMail(to, cc, bcc, subject, body, attachList, inlineList);
 
                 // Update counter only after attempt
                 sentCount++;
@@ -157,8 +161,8 @@ public class MailMergeService {
         String bccTemplate,
         String spreadsheetBase64,
         String spreadsheetFileContentType,
-        List<Map<String, String>> attachments
-    ) throws Exception {
+        List<Map<String, String>> attachments,
+        List<Map<String, String>> inlineImages) throws Exception {
 
         if (spreadsheetBase64 == null || spreadsheetBase64.isEmpty()) {
             throw new IllegalArgumentException("Spreadsheet is missing");
@@ -216,6 +220,8 @@ public class MailMergeService {
             String subject = replace.apply(subjectTemplate);
             String body = replace.apply(bodyTemplate);
 
+            List<InlineImageDTO> inlineList = buildInlineImages(inlineImages);
+
             // Make it obvious this is not a real send
             if (subject == null) subject = "";
             subject = "[TEST] " + subject;
@@ -244,7 +250,8 @@ public class MailMergeService {
                 "",   // bcc
                 subject,
                 body,
-                attachList
+                attachList,
+                inlineList
             );
 
             // Push progress as a 1/1 event
@@ -281,5 +288,32 @@ public class MailMergeService {
             // preserve interrupt status if you want:
             // Thread.currentThread().interrupt();
         }
+    }
+
+    private List<InlineImageDTO> buildInlineImages(List<Map<String, String>> inlineImages) {
+        List<InlineImageDTO> out = new ArrayList<>();
+        if (inlineImages == null) return out;
+
+        for (Map<String, String> img : inlineImages) {
+            if (img == null) continue;
+
+            String cid = img.get("cid");
+            String contentType = img.get("fileContentType");
+            String base64 = img.get("base64");
+            String name = img.get("name");
+
+            if (cid == null || cid.isBlank()) continue;
+            if (contentType == null || contentType.isBlank()) continue;
+            if (base64 == null || base64.isBlank()) continue;
+
+            InlineImageDTO dto = new InlineImageDTO();
+            dto.setCid(cid.trim());
+            dto.setName((name == null || name.isBlank()) ? (cid + ".png") : name);
+            dto.setFileContentType(contentType);
+            dto.setFile(Base64.getDecoder().decode(base64));
+
+            out.add(dto);
+        }
+        return out;
     }
 }

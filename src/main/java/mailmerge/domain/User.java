@@ -60,6 +60,11 @@ public class User extends AbstractAuditingEntity<String> implements Serializable
     @Column(name = "image_url", length = 256)
     private String imageUrl;
 
+    // ✅ NEW: store email signature (HTML or text)
+    @Lob
+    @Column(name = "email_signature")
+    private String emailSignature;
+
     @JsonIgnore
     @ManyToMany
     @JoinTable(
@@ -134,6 +139,14 @@ public class User extends AbstractAuditingEntity<String> implements Serializable
 
     public void setLangKey(String langKey) {
         this.langKey = langKey;
+    }
+
+    public String getEmailSignature() {
+        return emailSignature;
+    }
+
+    public void setEmailSignature(String emailSignature) {
+        this.emailSignature = emailSignature;
     }
 
     public Set<Authority> getAuthorities() {

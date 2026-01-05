@@ -51,6 +51,9 @@ public class AdminUserDTO implements Serializable {
 
     private Set<String> authorities;
 
+    // ✅ NEW: email signature (HTML/TextBlob)
+    private String emailSignature;
+
     public AdminUserDTO() {
         // Empty constructor needed for Jackson.
     }
@@ -69,6 +72,9 @@ public class AdminUserDTO implements Serializable {
         this.lastModifiedBy = user.getLastModifiedBy();
         this.lastModifiedDate = user.getLastModifiedDate();
         this.authorities = user.getAuthorities().stream().map(Authority::getName).collect(Collectors.toSet());
+
+        // ✅ NEW
+        this.emailSignature = user.getEmailSignature();
     }
 
     public String getId() {
@@ -175,6 +181,14 @@ public class AdminUserDTO implements Serializable {
         this.authorities = authorities;
     }
 
+    public String getEmailSignature() {
+        return emailSignature;
+    }
+
+    public void setEmailSignature(String emailSignature) {
+        this.emailSignature = emailSignature;
+    }
+
     // prettier-ignore
     @Override
     public String toString() {
@@ -191,6 +205,7 @@ public class AdminUserDTO implements Serializable {
             ", lastModifiedBy='" + lastModifiedBy + '\'' +
             ", lastModifiedDate=" + lastModifiedDate +
             ", authorities=" + authorities +
+            ", emailSignature='" + emailSignature + '\'' +
             "}";
     }
 }

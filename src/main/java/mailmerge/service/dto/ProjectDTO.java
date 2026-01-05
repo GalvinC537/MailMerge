@@ -19,6 +19,9 @@ public class ProjectDTO implements Serializable {
     @Size(min = 1)
     private String name;
 
+    // ✅ NEW: store the original spreadsheet filename (e.g. "scores.xlsx")
+    private String spreadsheetName;
+
     @Lob
     private byte[] spreadsheetLink;
 
@@ -63,6 +66,14 @@ public class ProjectDTO implements Serializable {
         this.name = name;
     }
 
+    public String getSpreadsheetName() {
+        return spreadsheetName;
+    }
+
+    public void setSpreadsheetName(String spreadsheetName) {
+        this.spreadsheetName = spreadsheetName;
+    }
+
     public byte[] getSpreadsheetLink() {
         return spreadsheetLink;
     }
@@ -78,6 +89,7 @@ public class ProjectDTO implements Serializable {
     public void setSpreadsheetFileContentType(String spreadsheetFileContentType) {
         this.spreadsheetFileContentType = spreadsheetFileContentType;
     }
+
     public String getSpreadsheetLinkContentType() {
         return spreadsheetLinkContentType;
     }
@@ -177,7 +189,9 @@ public class ProjectDTO implements Serializable {
         return "ProjectDTO{" +
             "id=" + getId() +
             ", name='" + getName() + "'" +
+            ", spreadsheetName='" + getSpreadsheetName() + "'" +
             ", spreadsheetLink='" + getSpreadsheetLink() + "'" +
+            ", spreadsheetLinkContentType='" + getSpreadsheetLinkContentType() + "'" +
             ", spreadsheetFileContentType='" + getSpreadsheetFileContentType() + "'" +
             ", toField='" + getToField() + "'" +
             ", ccField='" + getCcField() + "'" +

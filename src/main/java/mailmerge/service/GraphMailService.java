@@ -1,12 +1,12 @@
 package mailmerge.service;
 
+import mailmerge.service.dto.AttachmentDTO;
 import mailmerge.service.dto.MailProgressEvent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-
-import mailmerge.service.dto.AttachmentDTO;
+import mailmerge.service.dto.InlineImageDTO;
 
 import java.util.*;
 
@@ -24,6 +24,9 @@ public class GraphMailService {
 
     /**
      * Sends a message via Microsoft Graph (BLOCKING, STABLE VERSION)
+     * Supports:
+     *  - normal file attachments
+     *  - inline images (CID) for <img src="cid:...">
      */
     public boolean sendMail(
         String to,
@@ -31,40 +34,69 @@ public class GraphMailService {
         String bcc,
         String subject,
         String body,
-        List<AttachmentDTO> attachments
+        List<AttachmentDTO> attachments,
+        List<InlineImageDTO> inlineImages
     ) {
         try {
-
-            // 🔵 Emit START/SENDING event BEFORE calling Graph API
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,
-                    false, // not done yet
-                    -1,    // MailMergeService controls the counter
+                    false,
+                    -1,
                     -1,
                     "Sending..."
                 )
             );
 
-            log.info("📧 Sending email to={} cc={} bcc={} subject={} attachments={}",
-                to, cc, bcc, subject, attachments != null ? attachments.size() : 0);
+            log.info("📧 Sending email to={} cc={} bcc={} subject={} attachments={} inlineImages={}",
+                to, cc, bcc, subject,
+                attachments != null ? attachments.size() : 0,
+                inlineImages != null ? inlineImages.size() : 0
+            );
 
-            // Convert comma-separated addresses
             List<Map<String, Object>> toRecipients = buildRecipients(to);
             List<Map<String, Object>> ccRecipients = buildRecipients(cc);
             List<Map<String, Object>> bccRecipients = buildRecipients(bcc);
 
-            // Convert AttachmentDTO list to Graph attachments
+            // Graph attachments includes BOTH normal attachments + inline image attachments
             List<Map<String, Object>> graphAttachments = new ArrayList<>();
+
+            // 1) Normal attachments
             if (attachments != null) {
                 for (AttachmentDTO a : attachments) {
-                    if (a.getFile() == null) continue;
+                    if (a == null || a.getFile() == null) continue;
 
                     Map<String, Object> attach = new HashMap<>();
                     attach.put("@odata.type", "#microsoft.graph.fileAttachment");
                     attach.put("name", a.getName());
                     attach.put("contentType", a.getFileContentType());
                     attach.put("contentBytes", Base64.getEncoder().encodeToString(a.getFile()));
+                    attach.put("isInline", false);
+
+                    graphAttachments.add(attach);
+                }
+            }
+
+            // 2) Inline images (CID)
+            if (inlineImages != null) {
+                for (InlineImageDTO img : inlineImages) {
+                    if (img == null || img.getFile() == null) continue;
+
+                    String cid = img.getCid();
+                    if (cid == null || cid.isBlank()) continue;
+
+                    Map<String, Object> attach = new HashMap<>();
+                    attach.put("@odata.type", "#microsoft.graph.fileAttachment");
+
+                    String name = img.getName();
+                    attach.put("name", (name != null && !name.isBlank()) ? name : (cid + ".png"));
+
+                    String ct = img.getFileContentType();
+                    attach.put("contentType", (ct != null && !ct.isBlank()) ? ct : "image/png");
+
+                    attach.put("contentBytes", Base64.getEncoder().encodeToString(img.getFile()));
+                    attach.put("isInline", true);
+                    attach.put("contentId", cid.trim()); // MUST match <img src="cid:...">
 
                     graphAttachments.add(attach);
                 }
@@ -83,7 +115,6 @@ public class GraphMailService {
                 "saveToSentItems", true
             );
 
-            // MS GRAPH SEND
             graphWebClient.post()
                 .uri("/me/sendMail")
                 .bodyValue(payload)
@@ -93,11 +124,10 @@ public class GraphMailService {
 
             log.info("✅ Email sent successfully to {}", to);
 
-            // 🟢 Emit SUCCESS progress event
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,
-                    true,   // success
+                    true,
                     -1,
                     -1,
                     "Sent successfully"
@@ -107,9 +137,8 @@ public class GraphMailService {
             return true;
 
         } catch (Exception e) {
-            log.error("❌ Failed to send email: {}", e.getMessage());
+            log.error("❌ Failed to send email: {}", e.getMessage(), e);
 
-            // 🔴 Emit FAILURE event
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,

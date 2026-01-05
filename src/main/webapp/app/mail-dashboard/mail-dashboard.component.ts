@@ -11,8 +11,9 @@ import { Account } from 'app/core/auth/account.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OneDriveService, OneDriveFileDto } from 'app/services/one-drive.service';
 import { AttachmentService } from 'app/project/attachment.service';
-import { forkJoin, of, switchMap, tap } from 'rxjs';
+import { forkJoin, of, switchMap, tap, catchError, finalize } from 'rxjs';
 import { AiRewriteService } from '../services/ai-rewrite.service';
+import { SignatureService } from 'app/core/auth/signature.service';
 import {
   faTrash,
   faPaperclip,
@@ -24,11 +25,12 @@ import {
   faEye,
   faLink,
   faPenToSquare,
+  faSignature,
 } from '@fortawesome/free-solid-svg-icons';
-// (optional) if you use other icons, add them here too
 
 type MergeField = 'to' | 'cc' | 'bcc' | 'subject' | 'body';
-type RightPanel = 'compose' | 'howto' | 'sheet' | 'ai' | 'preview';
+type RightPanel = 'blank' | 'compose' | 'howto' | 'sheet' | 'ai' | 'preview';
+type InlineImage = { cid: string; fileContentType: string; base64: string; name: string };
 
 @Component({
   standalone: true,
@@ -55,6 +57,8 @@ export class MailDashboardComponent implements OnInit {
   mergeSubjectTemplate = '';
   mergeBodyTemplate = '';
   mergeFile: File | null = null;
+
+  // ✅ Used to remember/display the filename even when spreadsheet is re-hydrated from DB
   mergeFileName: string | null = null;
 
   faTrash = faTrash;
@@ -67,8 +71,25 @@ export class MailDashboardComponent implements OnInit {
   faPreview = faEye;
   faLink = faLink;
   faCompose = faPenToSquare;
+  faSignature = faSignature;
 
+  signatureDraftHtml = '';
   showBcc = false;
+
+  // -----------------------
+  // Signature
+  // -----------------------
+  signaturePanelOpen = false;
+  signatureSaved = '';
+  signatureDraft = '';
+
+  projectSearch = '';
+
+  folderOpen: Record<'PENDING' | 'FAILED' | 'SENT', boolean> = {
+    PENDING: true,
+    FAILED: false,
+    SENT: false,
+  };
 
   tokenColors: Record<string, string> = {};
 
@@ -139,9 +160,15 @@ export class MailDashboardComponent implements OnInit {
   howToVisible = false; // (legacy var; safe to remove once HTML stops referencing it)
 
   // ✅ Single source of truth for right side
-  activePanel: RightPanel = 'compose';
+  activePanel: RightPanel = 'blank';
 
   private skipTokenRender = false;
+
+  private pendingAttachmentReads = 0;
+
+  // ✅ Hide projects only while a delete request is in-flight (prevents "ghosts" without breaking create)
+  private readonly pendingDeletedProjectIds = new Set<number>();
+  private deletingProject = false;
 
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
@@ -152,6 +179,8 @@ export class MailDashboardComponent implements OnInit {
   private readonly attachmentService = inject(AttachmentService);
   private readonly aiRewriteService = inject(AiRewriteService);
   private readonly oneDriveService = inject(OneDriveService);
+  private readonly signatureService = inject(SignatureService);
+  private readonly SIGN_DELIM = '\n\n--\n';
   private sendQueuedTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private sendQueuedIntervalId: ReturnType<typeof setInterval> | null = null;
 
@@ -168,9 +197,8 @@ export class MailDashboardComponent implements OnInit {
         this.projectId = Number(idParam);
         this.loadProject(this.projectId);
       } else {
-        this.projectId = null;
-        // ✅ no project loaded -> default compose
-        this.activePanel = 'compose';
+        // ✅ When no project is selected, RHS should be blank
+        this.clearEditorState();
       }
     });
 
@@ -235,12 +263,20 @@ export class MailDashboardComponent implements OnInit {
     });
   }
 
+  get hasSelectedProject(): boolean {
+    return !!this.projectId;
+  }
+
   // -----------------------
   // Sidebar actions
   // -----------------------
   loadProjects(): void {
     this.projectService.findMy().subscribe({
-      next: projects => (this.projects = projects),
+      next: projects => {
+        // ✅ hide only things currently being deleted
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        this.projects = (projects ?? []).filter(p => !p.id || !this.pendingDeletedProjectIds.has(p.id));
+      },
       error: err => console.error('❌ Failed to load projects', err),
     });
   }
@@ -256,8 +292,15 @@ export class MailDashboardComponent implements OnInit {
     const project: Project = { name };
     this.projectService.create(project).subscribe({
       next: created => {
+        // ✅ if an id gets reused, don't let the "pending delete" filter hide it
+        if (created.id) this.pendingDeletedProjectIds.delete(created.id);
+
+        // ✅ Optimistically show it immediately
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        this.projects = [created, ...(this.projects ?? []).filter(p => p.id !== created.id)];
+
         this.loadProjects();
-        // ✅ always start on compose
+        // ✅ keep RHS blank until the router loads the selected project
         this.activePanel = 'compose';
         void this.router.navigate(['/mail', created.id]);
       },
@@ -267,17 +310,40 @@ export class MailDashboardComponent implements OnInit {
 
   deleteCurrentProject(): void {
     if (!this.projectId) return;
+    if (this.deletingProject) return;
+
+    const deletingId = this.projectId;
 
     const ok = window.confirm('Delete this project?');
     if (!ok) return;
 
-    this.projectService.delete(this.projectId).subscribe({
+    this.deletingProject = true;
+
+    // ✅ hide in UI while delete is happening
+    this.pendingDeletedProjectIds.add(deletingId);
+
+    // ✅ Optimistically remove from sidebar immediately
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    this.projects = (this.projects ?? []).filter(p => p.id !== deletingId);
+
+    // ✅ Immediately leave /mail/:id so we never try to load a deleted project
+    this.clearEditorState();
+    void this.router.navigate(['/mail']);
+
+    // ✅ Then delete on the backend + refresh list
+    this.projectService.delete(deletingId).subscribe({
       next: () => {
+        // ✅ deletion finished, stop hiding the id
+        this.pendingDeletedProjectIds.delete(deletingId);
+        this.deletingProject = false;
         this.loadProjects();
-        this.clearEditorState();
-        void this.router.navigate(['/mail']);
       },
-      error: err => console.error('❌ Failed to delete project', err),
+      error: err => {
+        console.error('❌ Failed to delete project', err);
+        this.pendingDeletedProjectIds.delete(deletingId);
+        this.deletingProject = false;
+        this.loadProjects();
+      },
     });
   }
 
@@ -292,11 +358,14 @@ export class MailDashboardComponent implements OnInit {
     this.bccField = '';
     this.attachments = [];
     this.deletedAttachmentIds = [];
+    this.attachmentsLoading = false;
+    this.sendMenuOpen = false;
+
     this.removeSpreadsheet();
     this.previewEmails = [];
 
-    // ✅ reset view
-    this.activePanel = 'compose';
+    // ✅ blank RHS until a project is selected/created
+    this.activePanel = 'blank';
   }
 
   // -----------------------
@@ -304,11 +373,14 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleSendMenu(): void {
+    if (!this.hasSelectedProject) return;
     this.sendMenuOpen = !this.sendMenuOpen;
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   connectSpreadsheet(): void {
+    if (!this.hasSelectedProject) return;
+
     if (this.spreadsheetSource === 'LOCAL') {
       this.mergeFileInput?.nativeElement.click();
       return;
@@ -318,6 +390,7 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   openAttachmentsPicker(): void {
+    if (!this.hasSelectedProject) return;
     this.attachmentsInput?.nativeElement.click();
   }
 
@@ -336,6 +409,8 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   setPanel(panel: RightPanel): void {
+    if (!this.hasSelectedProject) return;
+
     // clicking the same panel again returns to Compose (nice UX)
     this.activePanel = this.activePanel === panel ? 'compose' : panel;
 
@@ -357,16 +432,20 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   onDragStart(event: DragEvent, header: string): void {
+    if (!this.hasSelectedProject) return;
     event.dataTransfer?.setData('text/plain', `{{${header}}}`);
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   allowDrop(event: DragEvent): void {
+    if (!this.hasSelectedProject) return;
     event.preventDefault();
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   onDrop(event: DragEvent, field: MergeField): void {
+    if (!this.hasSelectedProject) return;
+
     event.preventDefault();
     const text = event.dataTransfer?.getData('text/plain') ?? '';
     const el = document.getElementById(this.getElementId(field));
@@ -397,6 +476,8 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   onMergeFileChange(event: Event): void {
+    if (!this.hasSelectedProject) return;
+
     this.spreadsheetSource = 'LOCAL';
     this.oneDriveSpreadsheetName = null;
 
@@ -438,21 +519,46 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   onAttachmentsChange(event: Event): void {
+    if (!this.hasSelectedProject) return;
+
     const input = event.target as HTMLInputElement | null;
     if (!input?.files || input.files.length === 0) return;
 
-    Array.from(input.files).forEach(file => {
+    const files = Array.from(input.files);
+
+    // ✅ mark attachments as "loading" while FileReader is running
+    this.pendingAttachmentReads += files.length;
+    this.attachmentsLoading = true;
+
+    files.forEach(file => {
       const fr = new FileReader();
+
       fr.onload = e => {
         const dataUrl = (e.target as FileReader).result as string;
         const base64 = dataUrl.split(',')[1] ?? '';
+
         this.attachments.push({
           name: file.name,
           size: file.size,
           fileContentType: file.type || 'application/octet-stream',
           base64,
         });
+
+        this.pendingAttachmentReads--;
+        if (this.pendingAttachmentReads <= 0) {
+          this.pendingAttachmentReads = 0;
+          this.attachmentsLoading = false;
+        }
       };
+
+      fr.onerror = () => {
+        this.pendingAttachmentReads--;
+        if (this.pendingAttachmentReads <= 0) {
+          this.pendingAttachmentReads = 0;
+          this.attachmentsLoading = false;
+        }
+      };
+
       fr.readAsDataURL(file);
     });
 
@@ -461,6 +567,8 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   removeAttachment(index: number): void {
+    if (!this.hasSelectedProject) return;
+
     const removed = this.attachments.splice(index, 1)[0];
     if (removed.id) {
       this.deletedAttachmentIds.push(removed.id);
@@ -472,20 +580,51 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   loadProject(id: number): void {
-    this.projectService.find(id).subscribe({
-      next: p => {
+    // ✅ clear previous project's state immediately (prevents spreadsheet bleeding)
+    this.project = null;
+    this.projectName = '';
+    this.mergeSubjectTemplate = '';
+    this.mergeBodyTemplate = '';
+    this.toField = '';
+    this.ccField = '';
+    this.bccField = '';
+    this.showBcc = false;
+
+    this.attachments = [];
+    this.deletedAttachmentIds = [];
+    this.attachmentsLoading = false;
+    this.sendMenuOpen = false;
+
+    this.removeSpreadsheet();
+    this.previewEmails = [];
+
+    // ✅ always land on compose when opening a project
+    this.activePanel = 'compose';
+
+    forkJoin({
+      sig: this.signatureService.get().pipe(catchError(() => of(''))),
+      p: this.projectService.find(id),
+    }).subscribe({
+      next: ({ sig, p }) => {
+        // ✅ signature loaded FIRST
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        this.signatureSaved = (sig ?? '').trim();
+        this.signatureDraft = this.signatureSaved;
+
+        // ✅ then apply it to the project content
         this.project = p;
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
         this.projectName = p.name ?? '';
         this.mergeSubjectTemplate = p.header ?? '';
-        this.mergeBodyTemplate = p.content ?? '';
+        this.mergeBodyTemplate = this.upsertSignature(p.content ?? '', this.signatureSaved);
+
         this.toField = (p as any).toField ?? '';
         this.ccField = (p as any).ccField ?? '';
         this.bccField = (p as any).bccField ?? '';
         this.showBcc = !!this.bccField.trim();
 
-        // ✅ always land on compose when opening a project
-        this.activePanel = 'compose';
+        // ✅ remember stored spreadsheet filename (so UI shows it)
+        this.mergeFileName = (p as any).spreadsheetName ?? null;
 
         if (p.spreadsheetLink) {
           this.spreadsheetBase64 = p.spreadsheetLink;
@@ -498,7 +637,9 @@ export class MailDashboardComponent implements OnInit {
           }
           const byteArray = new Uint8Array(byteNumbers);
 
-          const file = new File([byteArray], 'uploaded_spreadsheet.xlsx', {
+          const restoredName = (p as any).spreadsheetName ?? 'uploaded_spreadsheet.xlsx';
+
+          const file = new File([byteArray], restoredName, {
             type: this.spreadsheetFileContentType!,
           });
 
@@ -506,31 +647,46 @@ export class MailDashboardComponent implements OnInit {
         }
 
         this.attachmentsLoading = true;
-        this.attachmentService.findByProject(id).subscribe({
-          next: attachments => {
-            this.attachments = attachments.map(a => ({
-              id: a.id,
-              name: a.name,
-              size: a.size,
-              fileContentType: a.fileContentType,
-              base64: a.file,
-            }));
-            this.attachmentsLoading = false;
-            this.previewMerge();
-            setTimeout(() => {
-              (['body', 'subject', 'to', 'cc', 'bcc'] as MergeField[]).forEach(f => this.renderTokens(f));
-            });
-          },
-          error: err => {
-            console.error('❌ Failed to load attachments', err);
-            this.attachmentsLoading = false;
-          },
-        });
+
+        this.attachmentService
+          .findByProject(id)
+          .pipe(
+            finalize(() => {
+              // ✅ DB load finished; keep loading true only if local FileReader reads are still running
+              this.attachmentsLoading = this.pendingAttachmentReads > 0;
+            }),
+          )
+          .subscribe({
+            next: attachments => {
+              this.attachments = attachments.map(a => ({
+                id: a.id,
+                name: a.name,
+                size: a.size,
+                fileContentType: a.fileContentType,
+                base64: a.file,
+              }));
+
+              this.previewMerge();
+              setTimeout(() => {
+                (['body', 'subject', 'to', 'cc', 'bcc'] as MergeField[]).forEach(f => this.renderTokens(f));
+              });
+            },
+            error(err) {
+              console.error('❌ Failed to load attachments', err);
+            },
+          });
 
         this.previewMerge();
         this.loadProjects();
+
+        // ✅ ensure body editor shows the signature immediately
+        setTimeout(() => this.renderTokens('body'));
       },
-      error: err => console.error('❌ Failed to load project', err),
+      error: err => {
+        console.error('❌ Failed to load project/signature', err);
+        this.clearEditorState();
+        void this.router.navigate(['/mail']);
+      },
     });
   }
 
@@ -556,6 +712,9 @@ export class MailDashboardComponent implements OnInit {
       bccField: this.bccField,
       spreadsheetLink: hasSpreadsheet ? this.spreadsheetBase64 : null,
       spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
+
+      // ✅ NEW: persist original filename
+      spreadsheetName: hasSpreadsheet ? this.connectedSpreadsheetName : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -618,6 +777,9 @@ export class MailDashboardComponent implements OnInit {
       bccField: this.bccField,
       spreadsheetLink: hasSpreadsheet ? this.spreadsheetBase64 : null,
       spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
+
+      // ✅ NEW: persist original filename
+      spreadsheetName: hasSpreadsheet ? this.connectedSpreadsheetName : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -666,11 +828,14 @@ export class MailDashboardComponent implements OnInit {
     this.testErr.set(false);
     this.testSuccess = false;
 
+    const { htmlWithCid, inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
+
     this.saveProjectAndReturnObservable().subscribe({
       next: () => {
         const payload = {
           subjectTemplate: this.mergeSubjectTemplate,
-          bodyTemplate: this.convertMarkdownToHtml(this.mergeBodyTemplate),
+          bodyTemplate: htmlWithCid,
+          inlineImages,
           toTemplate: this.toField,
           ccTemplate: this.ccField,
           bccTemplate: this.bccField,
@@ -724,11 +889,14 @@ export class MailDashboardComponent implements OnInit {
     this.progressLogs = [];
     this.sendingFinished = false;
 
+    const { htmlWithCid, inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
+
     this.saveProjectAndReturnObservable().subscribe({
       next: () => {
         const payload = {
           subjectTemplate: this.mergeSubjectTemplate,
-          bodyTemplate: this.convertMarkdownToHtml(this.mergeBodyTemplate),
+          bodyTemplate: htmlWithCid,
+          inlineImages,
           toTemplate: this.toField,
           ccTemplate: this.ccField,
           bccTemplate: this.bccField,
@@ -763,6 +931,10 @@ export class MailDashboardComponent implements OnInit {
                 bccField: this.bccField ?? '',
                 spreadsheetLink: this.spreadsheetBase64 ?? null,
                 spreadsheetFileContentType: this.spreadsheetFileContentType ?? null,
+
+                // ✅ keep filename when marking sent
+                spreadsheetName: this.connectedSpreadsheetName,
+
                 status: 'SENT',
                 sentAt: new Date().toISOString(),
               };
@@ -837,13 +1009,16 @@ export class MailDashboardComponent implements OnInit {
   // eslint-disable-next-line @typescript-eslint/member-ordering
   downloadSpreadsheet(event: Event): void {
     event.preventDefault();
-    if (!this.spreadsheetBase64 || !this.mergeFile) return;
+    if (!this.spreadsheetBase64) return;
 
     const blob = this.base64ToBlob(this.spreadsheetBase64, this.spreadsheetFileContentType ?? 'application/octet-stream');
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = this.mergeFile.name;
+
+    // ✅ download with the stored name if mergeFile is rehydrated or missing
+    a.download = this.mergeFile?.name ?? this.mergeFileName ?? 'spreadsheet.xlsx';
+
     a.click();
     window.URL.revokeObjectURL(url);
   }
@@ -946,6 +1121,8 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   onEditorInput(field: MergeField): void {
+    if (!this.hasSelectedProject) return;
+
     const el = document.getElementById(this.getElementId(field));
     if (!el) return;
 
@@ -967,6 +1144,7 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   renderTokens(field: MergeField): void {
+    if (!this.hasSelectedProject) return;
     if (this.skipTokenRender) return;
 
     const el = document.getElementById(this.getElementId(field));
@@ -1018,6 +1196,8 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   formatFromToolbar(event: MouseEvent, type: 'bold' | 'italic' | 'underline'): void {
+    if (!this.hasSelectedProject) return;
+
     event.preventDefault();
     event.stopPropagation();
     this.applyFormatting(type);
@@ -1025,6 +1205,8 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   applyFormatting(type: 'bold' | 'italic' | 'underline'): void {
+    if (!this.hasSelectedProject) return;
+
     const bodyEl = document.getElementById('mergeBody');
     if (!bodyEl) return;
 
@@ -1045,19 +1227,29 @@ export class MailDashboardComponent implements OnInit {
   }
 
   private htmlToMarkdown(html: string): string {
-    return html
-      .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
-      .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
-      .replace(/<i[^>]*>(.*?)<\/i>/gi, '_$1_')
-      .replace(/<em[^>]*>(.*?)<\/em>/gi, '_$1_')
-      .replace(/<u[^>]*>(.*?)<\/u>/gi, '~$1~')
-      .replace(/<br\s*\/?>/gi, '\n')
-      .replace(/&nbsp;/g, ' ')
-      .trim();
+    return (
+      html
+        // ✅ HTTPS-only: <a href="https://...">text</a> -> [text](https://...)
+        .replace(/<a[^>]*href="(https:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+        .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
+        .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
+        .replace(/<i[^>]*>(.*?)<\/i>/gi, '_$1_')
+        .replace(/<em[^>]*>(.*?)<\/em>/gi, '_$1_')
+        .replace(/<u[^>]*>(.*?)<\/u>/gi, '~$1~')
+        .replace(/<br\s*\/?>/gi, '\n')
+        .replace(/&nbsp;/g, ' ')
+        .trim()
+    );
   }
 
   private convertMarkdownToHtml(md: string): string {
-    return md
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const src = md ?? '';
+
+    // ✅ HTTPS-only markdown links: [text](https://example.com)
+    const withLinks = src.replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+    return withLinks
       .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
       .replace(/__(.*?)__/g, '<strong>$1</strong>')
       .replace(/\*(.*?)\*/g, '<i>$1</i>')
@@ -1071,6 +1263,7 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   setSpreadsheetSource(source: 'LOCAL' | 'ONEDRIVE'): void {
+    if (!this.hasSelectedProject) return;
     if (this.spreadsheetSource === source) return;
 
     this.spreadsheetSource = source;
@@ -1084,6 +1277,8 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   openOneDrivePicker(): void {
+    if (!this.hasSelectedProject) return;
+
     this.spreadsheetSource = 'ONEDRIVE';
     this.oneDriveLoading = true;
     this.oneDriveError = null;
@@ -1110,11 +1305,11 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   selectOneDriveFile(file: OneDriveFileDto): void {
+    if (!this.hasSelectedProject) return;
+
     this.oneDriveLoading = true;
     this.oneDriveError = null;
 
-    // If OneDriveService return type is not ArrayBuffer, TS will complain.
-    // This cast fixes it without suppressing all TS checks.
     (this.oneDriveService.getSpreadsheetContent(file.id, file.driveId) as unknown as import('rxjs').Observable<ArrayBuffer>).subscribe({
       next: (arrayBuffer: ArrayBuffer) => {
         this.oneDriveLoading = false;
@@ -1136,7 +1331,10 @@ export class MailDashboardComponent implements OnInit {
 
   private loadSpreadsheetFile(file: File): void {
     this.mergeFile = file;
+
+    // ✅ keep the name around for UI + saving
     this.mergeFileName = file.name;
+
     this.spreadsheetFileContentType = file.type || 'application/octet-stream';
 
     const reader = new FileReader();
@@ -1232,10 +1430,11 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   handleOneDriveSelection(fileBytes: ArrayBuffer, fileName: string): void {
+    // ✅ clear old state first, then set OneDrive name so it doesn't get wiped
+    this.removeSpreadsheet();
+
     this.spreadsheetSource = 'ONEDRIVE';
     this.oneDriveSpreadsheetName = fileName;
-
-    this.removeSpreadsheet();
 
     const blob = new Blob([fileBytes], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
@@ -1255,7 +1454,6 @@ export class MailDashboardComponent implements OnInit {
   openProjectFromSidebar(p: Project): void {
     if (!p.id) return;
 
-    // Optional nice UX: expand when user clicks a project while collapsed
     if (this.sidebarCollapsed) this.toggleSidebar();
 
     this.sendMenuOpen = false;
@@ -1267,27 +1465,28 @@ export class MailDashboardComponent implements OnInit {
   }
 
   get connectedSpreadsheetName(): string {
-    return this.oneDriveSpreadsheetName ?? this.mergeFile?.name ?? 'Spreadsheet';
+    return this.oneDriveSpreadsheetName ?? this.mergeFile?.name ?? this.mergeFileName ?? 'Spreadsheet';
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleBcc(): void {
+    if (!this.hasSelectedProject) return;
+
     this.showBcc = !this.showBcc;
 
-    // When opening, focus the Bcc line like Outlook
     if (this.showBcc) {
       setTimeout(() => document.getElementById('bccField')?.focus());
     }
   }
+
   // -----------------------
   // Undo Send (frontend-only)
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   queueSendProject(): void {
-    // prevent double-queueing
+    if (!this.hasSelectedProject) return;
     if (this.sendQueued() || this.mergeSending()) return;
 
-    // same validation as sendProject()
     if (!this.projectId || !this.mergeFile) {
       this.mergeErr.set(true);
       return;
@@ -1297,14 +1496,12 @@ export class MailDashboardComponent implements OnInit {
       return;
     }
 
-    // clear any previous timers (safety)
     this.clearQueuedSendTimers();
 
     this.mergeErr.set(false);
     this.sendQueued.set(true);
     this.sendQueuedSeconds.set(10);
 
-    // countdown UI
     this.sendQueuedIntervalId = setInterval(() => {
       const s = this.sendQueuedSeconds();
       if (s <= 1) {
@@ -1318,13 +1515,11 @@ export class MailDashboardComponent implements OnInit {
       this.sendQueuedSeconds.set(s - 1);
     }, 1000);
 
-    // actual send after 10s
     this.sendQueuedTimeoutId = setTimeout(() => {
       this.clearQueuedSendTimers();
       this.sendQueued.set(false);
       this.sendQueuedSeconds.set(0);
 
-      // re-check in case state changed during countdown
       if (!this.projectId || !this.mergeFile) {
         this.mergeErr.set(true);
         return;
@@ -1334,13 +1529,13 @@ export class MailDashboardComponent implements OnInit {
         return;
       }
 
-      // call your existing logic
       this.sendProject();
     }, 10_000);
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   undoQueuedSend(): void {
+    if (!this.hasSelectedProject) return;
     if (!this.sendQueued()) return;
 
     this.clearQueuedSendTimers();
@@ -1357,5 +1552,243 @@ export class MailDashboardComponent implements OnInit {
       clearInterval(this.sendQueuedIntervalId);
       this.sendQueuedIntervalId = null;
     }
+  }
+
+  // -----------------------
+  // Signature helpers
+  // -----------------------
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  saveSignature(): void {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const sig = (this.signatureDraftHtml ?? '').trim();
+
+    // capture whatever is currently in the email body editor
+    this.onEditorInput('body');
+
+    this.signatureService.update(sig).subscribe({
+      next: () => {
+        this.signatureSaved = sig;
+        this.applySignatureToBody();
+        this.signaturePanelOpen = false;
+      },
+      error: err => console.error('❌ Failed to save signature', err),
+    });
+  }
+
+  private stripSignatureBlock(body: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const b = (body ?? '').replace(/\s+$/g, '');
+    const idx = b.lastIndexOf(this.SIGN_DELIM);
+    return idx >= 0 ? b.slice(0, idx).replace(/\s+$/g, '') : b;
+  }
+
+  private upsertSignature(body: string, signature: string): string {
+    const base = this.stripSignatureBlock(body);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const sig = (signature ?? '').trim();
+    if (!sig) return base;
+    return base ? `${base}${this.SIGN_DELIM}${sig}` : sig;
+  }
+
+  private applySignatureToBody(): void {
+    this.onEditorInput('body');
+    this.mergeBodyTemplate = this.upsertSignature(this.mergeBodyTemplate, this.signatureSaved);
+    this.previewMerge();
+    this.activePanel = 'compose';
+    setTimeout(() => this.renderTokens('body'));
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  onEditorPaste(event: ClipboardEvent, where: 'body' | 'signature'): void {
+    const items = event.clipboardData?.items;
+    if (!items) return;
+
+    const imageItem = Array.from(items).find(i => i.kind === 'file' && i.type.startsWith('image/'));
+    if (!imageItem) return; // allow normal paste (text etc.)
+
+    event.preventDefault();
+
+    const file = imageItem.getAsFile();
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      // eslint-disable-next-line @typescript-eslint/no-base-to-string
+      const dataUrl = String(reader.result ?? '');
+      if (!dataUrl.startsWith('data:image/')) return;
+
+      // Insert <img src="data:..."> at caret (so preview works)
+      this.insertHtmlAtCaret(`<img src="${dataUrl}" style="max-width:220px;height:auto;" />`);
+
+      // Sync your state
+      if (where === 'body') this.onEditorInput('body');
+      else this.onSignatureInput();
+    };
+    reader.readAsDataURL(file);
+  }
+
+  private insertHtmlAtCaret(html: string): void {
+    const sel = window.getSelection();
+    if (!sel?.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+    range.deleteContents();
+
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+
+    const frag = document.createDocumentFragment();
+    let node: ChildNode | null;
+    let last: ChildNode | null = null;
+
+    while ((node = temp.firstChild)) {
+      last = frag.appendChild(node);
+    }
+
+    range.insertNode(frag);
+
+    // move caret after inserted content
+    if (last) {
+      range.setStartAfter(last);
+      range.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleSignaturePanel(): void {
+    this.signaturePanelOpen = !this.signaturePanelOpen;
+
+    if (this.signaturePanelOpen) {
+      setTimeout(() => {
+        const el = document.getElementById('signatureEditor');
+        if (el) {
+          // load the saved signature into editor
+          el.innerHTML = this.convertMarkdownToHtml(this.signatureSaved || '');
+          el.focus();
+        }
+      });
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  onSignatureInput(): void {
+    const el = document.getElementById('signatureEditor');
+    if (!el) return;
+
+    // store as your existing “markdown-ish” format (it will preserve <img>)
+    this.signatureDraftHtml = this.htmlToMarkdown(el.innerHTML);
+  }
+
+  private buildEmailHtmlForSending(markdownBody: string): { htmlWithCid: string; inlineImages: InlineImage[] } {
+    const html = this.convertMarkdownToHtml(markdownBody || '');
+    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+    const inlineImages: InlineImage[] = [];
+    const imgs = Array.from(doc.querySelectorAll('img'));
+
+    imgs.forEach((img, idx) => {
+      const src = img.getAttribute('src') ?? '';
+      if (!src.startsWith('data:image/')) return;
+
+      const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) return;
+
+      const fileContentType = match[1];
+      const base64 = match[2];
+
+      // unique cid
+      // eslint-disable-next-line @typescript-eslint/restrict-plus-operands
+      const cid = `img_${(crypto as any).randomUUID ? crypto.randomUUID() : Date.now() + '_' + idx}`;
+      const ext = fileContentType.split('/')[1] || 'png';
+
+      inlineImages.push({
+        cid,
+        fileContentType,
+        base64,
+        name: `inline_${idx}.${ext}`,
+      });
+
+      // replace src with cid reference
+      img.setAttribute('src', `cid:${cid}`);
+    });
+
+    return { htmlWithCid: doc.body.innerHTML, inlineImages };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  insertHttpsLink(event: MouseEvent): void {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const selectedText = sel.toString().trim();
+
+    if (!selectedText) {
+      alert('Please select the text you want to turn into a link.');
+      return;
+    }
+
+    const url = (prompt('Enter HTTPS URL (must start with https://)') ?? '').trim();
+    if (!url) return;
+
+    if (!url.startsWith('https://')) {
+      alert('Only https:// links are allowed.');
+      return;
+    }
+
+    // Replace selected text with <a>
+    this.insertHtmlAtCaret(`<a href="${url}" target="_blank" rel="noopener noreferrer">${selectedText}</a>`);
+
+    // Sync editor → markdown → preview
+    this.onEditorInput('body');
+    setTimeout(() => this.renderTokens('body'));
+  }
+
+  // -----------------------
+  // Sidebar: Search / Filter
+  // -----------------------
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleFolder(key: 'PENDING' | 'FAILED' | 'SENT'): void {
+    this.folderOpen[key] = !this.folderOpen[key];
+  }
+
+  private matchesSearch(p: Project, q: string): boolean {
+    if (!q) return true;
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const name = (p.name ?? '').toLowerCase();
+    const status = String((p as any).status ?? '').toLowerCase(); // enum string or ''
+    return name.includes(q) || status.includes(q);
+  }
+
+  get filteredAllProjects(): Project[] {
+    const q = this.projectSearch.trim().toLowerCase();
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const list = this.projects ?? [];
+    if (!q) return list;
+    return list.filter(p => this.matchesSearch(p, q));
+  }
+
+  // "No status yet" (newly created / not saved / etc.)
+  get ungroupedProjects(): Project[] {
+    return this.filteredAllProjects.filter(p => !(p as any).status);
+  }
+
+  get pendingProjects(): Project[] {
+    return this.filteredAllProjects.filter(p => (p as any).status === 'PENDING');
+  }
+
+  get failedProjects(): Project[] {
+    return this.filteredAllProjects.filter(p => (p as any).status === 'FAILED');
+  }
+
+  get sentProjects(): Project[] {
+    return this.filteredAllProjects.filter(p => (p as any).status === 'SENT');
   }
 }
