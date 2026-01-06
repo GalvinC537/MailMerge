@@ -10,6 +10,7 @@ import { LoginService } from 'app/login/login.service';
 import { Account } from 'app/core/auth/account.model';
 import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OneDriveService, OneDriveFileDto } from 'app/services/one-drive.service';
+import { OneDrivePickerV8Service } from 'app/services/one-drive-picker-v8.service';
 import { AttachmentService } from 'app/project/attachment.service';
 import { forkJoin, of, switchMap, tap, catchError, finalize } from 'rxjs';
 import { AiRewriteService } from '../services/ai-rewrite.service';
@@ -180,6 +181,7 @@ export class MailDashboardComponent implements OnInit {
   private readonly aiRewriteService = inject(AiRewriteService);
   private readonly oneDriveService = inject(OneDriveService);
   private readonly signatureService = inject(SignatureService);
+  private readonly oneDrivePicker = inject(OneDrivePickerV8Service);
   private readonly SIGN_DELIM = '\n\n--\n';
   private sendQueuedTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private sendQueuedIntervalId: ReturnType<typeof setInterval> | null = null;
@@ -385,7 +387,9 @@ export class MailDashboardComponent implements OnInit {
       this.mergeFileInput?.nativeElement.click();
       return;
     }
-    this.openOneDrivePicker();
+
+    // ✅ must be called directly from the click
+    void this.openOneDrivePicker();
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -714,7 +718,7 @@ export class MailDashboardComponent implements OnInit {
       spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
 
       // ✅ NEW: persist original filename
-      spreadsheetName: hasSpreadsheet ? this.connectedSpreadsheetName : null,
+      spreadsheetName: hasSpreadsheet ? (this.oneDriveSpreadsheetName ?? this.mergeFileName ?? this.mergeFile?.name ?? null) : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -779,7 +783,7 @@ export class MailDashboardComponent implements OnInit {
       spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
 
       // ✅ NEW: persist original filename
-      spreadsheetName: hasSpreadsheet ? this.connectedSpreadsheetName : null,
+      spreadsheetName: hasSpreadsheet ? (this.oneDriveSpreadsheetName ?? this.mergeFileName ?? this.mergeFile?.name ?? null) : null,
     };
 
     const newAttachmentDTOs = this.attachments
@@ -1276,31 +1280,36 @@ export class MailDashboardComponent implements OnInit {
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
-  openOneDrivePicker(): void {
+  async openOneDrivePicker(): Promise<void> {
     if (!this.hasSelectedProject) return;
 
     this.spreadsheetSource = 'ONEDRIVE';
-    this.oneDriveLoading = true;
     this.oneDriveError = null;
-    this.oneDriveFiles = [];
-    this.oneDrivePickerVisible = false;
+    this.oneDriveLoading = true;
 
-    this.oneDriveService.listSpreadsheets().subscribe({
-      next: items => {
-        this.oneDriveLoading = false;
-        if (!items.length) {
-          this.oneDriveError = 'No spreadsheets found in your OneDrive root.';
-          return;
-        }
-        this.oneDriveFiles = items;
-        this.oneDrivePickerVisible = true;
-      },
-      error: err => {
-        this.oneDriveLoading = false;
-        console.error('❌ Failed to list OneDrive spreadsheets', err);
-        this.oneDriveError = 'Failed to load OneDrive spreadsheets. Please try again.';
-      },
-    });
+    // ✅ open popup immediately (must be directly from the click handler)
+    const win = window.open('', 'Picker', 'width=1080,height=680');
+    if (!win) {
+      this.oneDriveError = 'Popup blocked. Please allow popups for this site and try again.';
+      this.oneDriveLoading = false;
+      return;
+    }
+
+    try {
+      const { name, bytes } = await this.oneDrivePicker.pickExcelFileInWindow(win);
+      this.oneDrivePickerVisible = false;
+      this.handleOneDriveSelection(bytes, name);
+    } catch (e: any) {
+      const msg = e?.message ?? String(e);
+      this.oneDriveError = msg.includes('Popup blocked') ? 'Popup blocked. Please allow popups for this site and try again.' : msg;
+      try {
+        win.close();
+      } catch {
+        /* empty */
+      }
+    } finally {
+      this.oneDriveLoading = false;
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -1430,15 +1439,18 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   handleOneDriveSelection(fileBytes: ArrayBuffer, fileName: string): void {
-    // ✅ clear old state first, then set OneDrive name so it doesn't get wiped
     this.removeSpreadsheet();
 
     this.spreadsheetSource = 'ONEDRIVE';
+
+    // ✅ set BOTH names explicitly
     this.oneDriveSpreadsheetName = fileName;
+    this.mergeFileName = fileName;
 
     const blob = new Blob([fileBytes], {
       type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     });
+
     const file = new File([blob], fileName || 'onedrive.xlsx', { type: blob.type });
 
     this.loadSpreadsheetFile(file);
