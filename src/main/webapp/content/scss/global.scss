@@ -14,26 +14,23 @@ h4 {
   font-weight: 300;
 }
 
-/* Increase contrast of links to get 100% on Lighthouse Accessibility Audit. Override this color if you want to change the link color, or use a Bootswatch theme */
+/* Increase contrast of links */
 a {
   color: #533f03;
   font-weight: bold;
 }
 
-/* override hover color for dropdown-item forced by bootstrap to all a:not([href]):not([tabindex]) elements in _reboot.scss */
+a:hover {
+  color: #533f03;
+  cursor: pointer;
+}
+
 a:not([href]):not([tabindex]):hover.dropdown-item {
   color: $dropdown-link-hover-color;
 }
 
-/* override .dropdown-item.active background-color on hover */
 .dropdown-item.active:hover {
   background-color: mix($dropdown-link-hover-bg, $dropdown-link-active-bg, 50%);
-}
-
-a:hover {
-  color: #533f03;
-  /* make sure browsers use the pointer cursor for anchors, even with no href */
-  cursor: pointer;
 }
 
 .dropdown-item:hover {
@@ -41,58 +38,8 @@ a:hover {
 }
 
 /* ==========================================================================
-Browser Upgrade Prompt
-========================================================================== */
-.browserupgrade {
-  margin: 0.2em 0;
-  background: #ccc;
-  color: #000;
-  padding: 0.2em 0;
-}
-
-/* ==========================================================================
 Generic styles
 ========================================================================== */
-
-/* Error highlight on input fields */
-.ng-valid[required],
-.ng-valid.required {
-  border-left: 5px solid green;
-}
-
-.ng-invalid:not(form) {
-  border-left: 5px solid red;
-}
-
-/* other generic styles */
-
-.jh-card {
-  padding: 1.5%;
-  margin-top: 20px;
-  border: none;
-}
-
-.error {
-  color: white;
-  background-color: red;
-}
-
-.pad {
-  padding: 10px;
-}
-
-.w-40 {
-  width: 40% !important;
-}
-
-.w-60 {
-  width: 60% !important;
-}
-
-.break {
-  white-space: normal;
-  word-break: break-all;
-}
 
 .form-control {
   background-color: #fff;
@@ -103,129 +50,10 @@ Generic styles
   opacity: 1;
 }
 
-.footer {
-  border-top: 1px solid rgba(0, 0, 0, 0.125);
-}
-
-.hand,
-[jhisortby] {
-  cursor: pointer;
-}
-
 /* ==========================================================================
-Custom alerts for notification
-========================================================================== */
-.alerts {
-  .alert {
-    text-overflow: ellipsis;
-    pre {
-      background: none;
-      border: none;
-      font: inherit;
-      color: inherit;
-      padding: 0;
-      margin: 0;
-    }
-    .popover pre {
-      font-size: 10px;
-    }
-  }
-  .jhi-toast {
-    position: fixed;
-    width: 100%;
-    &.left {
-      left: 5px;
-    }
-    &.right {
-      right: 5px;
-    }
-    &.top {
-      top: 55px;
-    }
-    &.bottom {
-      bottom: 55px;
-    }
-  }
-}
-
-@media screen and (min-width: 480px) {
-  .alerts .jhi-toast {
-    width: 50%;
-  }
-}
-
-/* ==========================================================================
-entity list page css
+Navbar tweaks
 ========================================================================== */
 
-.table-entities thead th .d-flex > * {
-  margin: auto 0;
-}
-
-/* ==========================================================================
-entity detail page css
-========================================================================== */
-.row-md.jh-entity-details {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 10px;
-  line-height: 1.5;
-}
-
-@media screen and (min-width: 768px) {
-  .row-md.jh-entity-details > {
-    dt {
-      float: left;
-      overflow: hidden;
-      clear: left;
-      text-align: right;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-      padding: 0.5em 0;
-    }
-    dd {
-      border-bottom: 1px solid #eee;
-      padding: 0.5em 0;
-      margin-left: 0;
-    }
-  }
-}
-
-/* ==========================================================================
-ui bootstrap tweaks
-========================================================================== */
-.nav,
-.pagination,
-.carousel,
-.panel-title a {
-  cursor: pointer;
-}
-
-.thread-dump-modal-lock {
-  max-width: 450px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.dropdown-menu {
-  padding-left: 0px;
-}
-
-/* ==========================================================================
-angular-cli removes postcss-rtl processed inline css, processed rules must be added here instead
-========================================================================== */
-/* page-ribbon.component.scss */
-.ribbon {
-  left: -3.5em;
-  -moz-transform: rotate(-45deg);
-  -ms-transform: rotate(-45deg);
-  -o-transform: rotate(-45deg);
-  -webkit-transform: rotate(-45deg);
-  transform: rotate(-45deg);
-}
-
-/* navbar.component.scss */
 .navbar {
   ul.navbar-nav {
     .nav-item {
@@ -233,10 +61,11 @@ angular-cli removes postcss-rtl processed inline css, processed rules must be ad
     }
   }
 }
-/* jhipster-needle-scss-add-main JHipster will add new css style */
 
+/* ==========================================================================
+Typography fixes (email previews)
+========================================================================== */
 
-/* Fix bold / italic / underline inside email preview HTML */
 .mail-dashboard .preview-section .email-body strong,
 .mail-dashboard .preview-section .email-body b {
   font-weight: 700 !important;
@@ -251,28 +80,16 @@ angular-cli removes postcss-rtl processed inline css, processed rules must be ad
   text-decoration: underline !important;
 }
 
-/* Fix bold / italic / underline inside AI rewrite preview */
-.mail-dashboard .ai-preview-box .ai-preview-content strong,
-.mail-dashboard .ai-preview-box .ai-preview-content b {
-  font-weight: 700 !important;
-}
+/* ==========================================================================
+THEME VARIABLES
+========================================================================== */
 
-.mail-dashboard .ai-preview-box .ai-preview-content i,
-.mail-dashboard .ai-preview-box .ai-preview-content em {
-  font-style: italic !important;
-}
-
-.mail-dashboard .ai-preview-box .ai-preview-content u {
-  text-decoration: underline !important;
-}
-
+/* 🌞 Light mode (default) */
 :root {
-  /* Primary accent = CYAN */
   --mm-primary: #00bcd4;
   --mm-primary-soft: rgba(0, 188, 212, 0.14);
   --mm-focus: 0 0 0 3px rgba(0, 188, 212, 0.25);
 
-  /* Outlook-like neutrals */
   --mm-bg: #ffffff;
   --mm-panel: #fafafa;
   --mm-hover: #f3f3f3;
@@ -280,4 +97,93 @@ angular-cli removes postcss-rtl processed inline css, processed rules must be ad
   --mm-text: #111;
   --mm-muted: #666;
   --mm-danger: #dc3545;
+}
+
+/* 🌙 Dark mode (THIS WAS MISSING) */
+:root[data-theme='dark'] {
+  --mm-bg: #0f141a;
+  --mm-panel: #121923;
+  --mm-hover: rgba(255, 255, 255, 0.06);
+  --mm-border: rgba(255, 255, 255, 0.12);
+  --mm-text: rgba(255, 255, 255, 0.92);
+  --mm-muted: rgba(255, 255, 255, 0.62);
+
+  --mm-primary-soft: rgba(0, 188, 212, 0.22);
+  --mm-focus: 0 0 0 3px rgba(0, 188, 212, 0.35);
+}
+
+/* ==========================================================================
+DARK MODE FIXES (buttons / toolbar / links)
+========================================================================== */
+
+/* Fix global links (override brown) */
+:root[data-theme='dark'] a {
+  color: var(--mm-primary);
+}
+
+:root[data-theme='dark'] a:hover {
+  color: var(--mm-primary);
+}
+
+/* Toolbar buttons (bold / italic / underline / link) */
+:root[data-theme='dark'] .mm-btn,
+:root[data-theme='dark'] .mm-icon-btn,
+:root[data-theme='dark'] .mm-link-btn,
+:root[data-theme='dark'] .mm-toolbar button {
+  color: var(--mm-text);
+}
+
+/* FontAwesome icons */
+:root[data-theme='dark'] fa-icon,
+:root[data-theme='dark'] svg {
+  color: currentColor;
+}
+
+/* Bootstrap buttons (attachments etc.) */
+:root[data-theme='dark'] .btn,
+:root[data-theme='dark'] .btn-outline-dark,
+:root[data-theme='dark'] .btn-outline-secondary,
+:root[data-theme='dark'] .btn-link {
+  color: var(--mm-text);
+  border-color: var(--mm-border);
+}
+
+:root[data-theme='dark'] .btn:hover {
+  background: var(--mm-hover);
+}
+
+/* Delete buttons stay red */
+:root[data-theme='dark'] .mm-link-danger,
+:root[data-theme='dark'] .btn-danger,
+:root[data-theme='dark'] .btn-outline-danger {
+  color: var(--mm-danger);
+}
+
+/* =========================================================
+   Dark mode – remove hardcoded white backgrounds
+   ========================================================= */
+
+/* Make the page background dark too (fixes any outer white areas) */
+body {
+  background: var(--mm-panel);
+  color: var(--mm-text);
+}
+
+/* Hover states that were using #fff */
+:root[data-theme='dark'] .mm-project-item:hover {
+  background: var(--mm-hover) !important;
+}
+
+:root[data-theme='dark'] .mm-folder:hover {
+  background: var(--mm-hover) !important;
+}
+
+/* Focus state on search input (was #fff) */
+:root[data-theme='dark'] .mm-project-search-input:focus {
+  background: var(--mm-panel) !important;
+}
+
+/* Toast background (was #fff) */
+:root[data-theme='dark'] .mm-toast {
+  background: var(--mm-bg) !important;
 }

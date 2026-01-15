@@ -91,3 +91,105 @@
 .navbar-brand .navbar-title {
   color: inherit;
 }
+
+
+.mm-theme-toggle {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+
+  /* match link paddings/hover */
+  border-radius: 6px;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+/* Brand logo image (PNG) */
+.brand-logo {
+  height: 36px;          /* tweak: 28–40px usually ideal */
+  width: auto;           /* keep aspect ratio */
+  display: inline-block;
+  vertical-align: middle;
+  object-fit: contain;
+}
+
+/* Optional: slightly smaller on very small screens */
+@media (max-width: 576px) {
+  .brand-logo {
+    height: 30px;
+  }
+}
+
+/* Signature modal styling (keeps it consistent with your “Create new mailmerge” popup) */
+.mm-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1050;
+}
+
+.mm-modal {
+  width: min(560px, calc(100vw - 24px));
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+  padding: 14px;
+}
+
+.mm-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.mm-modal-title {
+  font-weight: 700;
+  color: var(--mm-text);
+}
+
+.mm-modal-body {
+  color: var(--mm-text);
+}
+
+.mm-modal-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.mm-signature-textarea {
+  background: var(--mm-panel);
+  color: var(--mm-text);
+  border: 1px solid var(--mm-border);
+}
+
+.mm-signature-textarea:focus {
+  box-shadow: var(--mm-focus);
+  border-color: transparent;
+  outline: none;
+}
+
+.mm-error {
+  color: var(--mm-danger);
+}
+
+.mm-muted {
+  color: var(--mm-muted);
+}
+
+.mm-icon-btn {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  color: var(--mm-text);
+}
