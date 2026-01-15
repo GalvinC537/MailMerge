@@ -9,7 +9,13 @@ $mm-focus: var(--mm-focus);
   background-color: var(--mm-bg);
   color: var(--mm-text);
   font-family: 'Segoe UI', Roboto, Arial, sans-serif;
-  padding-top: 4rem;
+
+  /* nicer layout on both themes */
+  min-height: calc(100vh - 4rem);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 1rem;
 
   h1 {
     font-weight: 600;
@@ -19,17 +25,28 @@ $mm-focus: var(--mm-focus);
   .lead {
     color: var(--mm-muted);
   }
+
+  /* optional "card" feel so it doesn't float on the body background */
+  .home-content {
+    background: var(--mm-panel);
+    border: 1px solid var(--mm-border);
+    border-radius: 14px;
+    padding: 2rem 1.75rem;
+    max-width: 520px;
+    width: 100%;
+  }
 }
 
-/* Sign in button */
-.sign-in-btn {
+/* Sign in button
+   NOTE: use `.btn.sign-in-btn` so it overrides `:root[data-theme='dark'] .btn` */
+.btn.sign-in-btn {
   background-color: #ffffff;
   color: $mm-primary;
   border: 2px solid $mm-primary;
   font-weight: 600;
   padding: 0.6rem 1.6rem;
-  border-radius: 8px;
-  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  border-radius: 10px;
+  transition: background-color 0.2s ease, color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.05s ease;
 
   &:hover {
     background-color: $mm-primary;
@@ -46,4 +63,16 @@ $mm-focus: var(--mm-focus);
   &:active {
     transform: translateY(1px);
   }
+}
+
+/* Dark-mode specific refinements for the sign-in button (keeps it from looking "white sticker") */
+:root[data-theme='dark'] .btn.sign-in-btn {
+  background-color: var(--mm-panel);
+  color: var(--mm-primary);
+  border-color: var(--mm-primary);
+}
+
+:root[data-theme='dark'] .btn.sign-in-btn:hover {
+  background-color: var(--mm-primary);
+  color: #0f141a; /* readable on cyan; change to #fff if you prefer */
 }

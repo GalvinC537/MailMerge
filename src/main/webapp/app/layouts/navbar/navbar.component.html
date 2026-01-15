@@ -2,11 +2,11 @@
   <div class="container-fluid">
     <!-- Logo and Title -->
     <a class="navbar-brand logo d-flex align-items-center" routerLink="/" (click)="collapseNavbar()">
-      <span class="logo-img me-2"></span>
+      <img class="brand-logo me-2" src="content/images/mailmerge_logo_no_bg.png" alt="MailMerge logo" />
       <span class="navbar-title fw-semibold">Mailmerge</span>
     </a>
 
-    <!-- Toggle feature for mobile if needed  -->
+    <!-- Toggle feature for mobile if needed -->
     <a
       class="navbar-toggler d-lg-none"
       href="javascript:void(0);"
@@ -22,8 +22,7 @@
 
     <div class="navbar-collapse collapse" id="navbarResponsive" [ngbCollapse]="isNavbarCollapsed()">
       <ul class="navbar-nav ms-auto align-items-center">
-
-        <!-- This is the code for the home button-->
+        <!-- Home button -->
         <li class="nav-item" routerLinkActive="active" [routerLinkActiveOptions]="{ exact: true }">
           <a class="nav-link text-primary" routerLink="/" (click)="collapseNavbar()">
             <fa-icon icon="home" class="me-1"></fa-icon>
@@ -31,7 +30,7 @@
           </a>
         </li>
 
-        <!-- This below is for the account drop down bar - this is the Jhipster template -->
+        <!-- Account dropdown -->
         <li
           ngbDropdown
           class="nav-item dropdown pointer"
@@ -50,7 +49,41 @@
             <fa-icon icon="user-circle" class="me-1"></fa-icon>
             <span>{{ accountRef?.login || 'Account' }}</span>
           </a>
+
           <ul class="dropdown-menu" ngbDropdownMenu aria-labelledby="account-menu">
+            <!-- Theme toggle -->
+            <li>
+              <button type="button" class="dropdown-item" (click)="toggleTheme()">
+                <fa-icon icon="adjust" [fixedWidth]="true"></fa-icon>
+                <span>Change theme</span>
+              </button>
+            </li>
+
+            <li>
+              <a
+                class="dropdown-item"
+                href="https://forms.office.com/Pages/ResponsePage.aspx?id=DQSIkWdsW0yxEjajBLZtrQAAAAAAAAAAAAO__qNMtoxUNzZFOE5HQldWTDg0SU85SlkzSlgzV1IySS4u"
+                target="_blank"
+                rel="noopener noreferrer"
+                (click)="collapseNavbar()"
+              >
+                <fa-icon [icon]="faBug" [fixedWidth]="true"></fa-icon>
+                <span>Report a bug</span>
+              </a>
+            </li>
+
+            <!-- Signature (ONLY when logged in) -->
+            @if (accountRef !== null) {
+              <li>
+                <button type="button" class="dropdown-item" (click)="openSignatureModal()">
+                  <fa-icon icon="signature" [fixedWidth]="true"></fa-icon>
+                  <span>Signature</span>
+                </button>
+              </li>
+            }
+
+            <li><hr class="dropdown-divider" /></li>
+
             @if (accountRef !== null) {
               <li>
                 <a class="dropdown-item" (click)="logout()" id="logout" data-cy="logout">
@@ -72,3 +105,36 @@
     </div>
   </div>
 </nav>
+
+<!-- =========================
+     Signature Modal (Navbar)
+     ========================= -->
+<div class="mm-modal-backdrop" *ngIf="signatureModalOpen" (click)="closeSignatureModal()">
+  <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="mmSignatureTitle" (click)="$event.stopPropagation()">
+    <div class="mm-modal-header">
+      <div id="mmSignatureTitle" class="mm-modal-title">Signature</div>
+      <button type="button" class="mm-icon-btn" title="Close" (click)="closeSignatureModal()">✕</button>
+    </div>
+
+    <div class="mm-modal-body">
+      <div class="mm-muted mb-2">Paste or type your signature below</div>
+
+      <textarea
+        class="form-control mm-signature-textarea"
+        [(ngModel)]="signatureDraft"
+        name="signatureDraft"
+        rows="7"
+        placeholder="e.g. Regards, Conor..."
+      ></textarea>
+
+      <div *ngIf="signatureError" class="mm-error mt-2">{{ signatureError }}</div>
+    </div>
+
+    <div class="mm-modal-footer">
+      <button type="button" class="mm-btn" (click)="closeSignatureModal()">Cancel</button>
+      <button type="button" class="mm-btn mm-btn-primary" (click)="saveSignatureFromModal()" [disabled]="signatureSaving">
+        {{ signatureSaving ? 'Saving…' : 'Save' }}
+      </button>
+    </div>
+  </div>
+</div>

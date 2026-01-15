@@ -30,7 +30,7 @@ import {
 } from '@fortawesome/free-solid-svg-icons';
 
 type MergeField = 'to' | 'cc' | 'bcc' | 'subject' | 'body';
-type RightPanel = 'blank' | 'compose' | 'howto' | 'sheet' | 'ai' | 'preview';
+type RightPanel = 'blank' | 'compose' | 'howto' | 'sheet' | 'ai' | 'preview' | 'signature';
 type InlineImage = { cid: string; fileContentType: string; base64: string; name: string };
 
 @Component({
@@ -80,9 +80,11 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // Signature
   // -----------------------
-  signaturePanelOpen = false;
   signatureSaved = '';
   signatureDraft = '';
+
+  deleteTargetId: number | null = null;
+  deleteTargetName = '';
 
   projectSearch = '';
 
@@ -93,6 +95,10 @@ export class MailDashboardComponent implements OnInit {
   };
 
   tokenColors: Record<string, string> = {};
+
+  creatingProject = false;
+  newProjectName = '';
+  deleteConfirmOpen = false;
 
   spreadsheetBase64: string | null = null;
   spreadsheetFileContentType: string | null = null;
@@ -116,6 +122,8 @@ export class MailDashboardComponent implements OnInit {
   ccField = '';
   bccField = '';
 
+  spreadsheetMenuOpen = false;
+  spreadsheetPreviewOpen = false;
   spreadsheetSource: 'LOCAL' | 'ONEDRIVE' = 'LOCAL';
   oneDriveSpreadsheetName: string | null = null;
   oneDriveLoading = false;
@@ -141,6 +149,14 @@ export class MailDashboardComponent implements OnInit {
   sendSuccess = false;
   attachmentsLoading = false;
 
+  bottomPreviewOpen = true; // ✅ Preview open by default
+  bottomAiOpen = false;
+
+  linkModalOpen = false;
+  linkUrlDraft = '';
+  linkTextDraft = '';
+  linkError: string | null = null;
+
   sendingProgress = 0;
   sendingTotal = 0;
   sendingInProgress = false;
@@ -163,13 +179,21 @@ export class MailDashboardComponent implements OnInit {
   // ✅ Single source of truth for right side
   activePanel: RightPanel = 'blank';
 
+  uiToast: { type: 'warn' | 'error' | 'ok'; text: string } | null = null;
+
   private skipTokenRender = false;
+
+  private savedBodyRange: Range | null = null;
+
+  private savedLinkRange: Range | null = null;
 
   private pendingAttachmentReads = 0;
 
   // ✅ Hide projects only while a delete request is in-flight (prevents "ghosts" without breaking create)
   private readonly pendingDeletedProjectIds = new Set<number>();
   private deletingProject = false;
+
+  private sendingFinishedTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   private readonly projectService = inject(ProjectService);
   private readonly accountService = inject(AccountService);
@@ -288,21 +312,20 @@ export class MailDashboardComponent implements OnInit {
   }
 
   newProject(): void {
-    const name = (window.prompt('Enter project name') ?? '').trim();
+    this.newProjectName = '';
+    this.creatingProject = true;
+  }
+
+  confirmCreateProject(): void {
+    const name = this.newProjectName.trim();
     if (!name) return;
+
+    this.creatingProject = false;
 
     const project: Project = { name };
     this.projectService.create(project).subscribe({
       next: created => {
-        // ✅ if an id gets reused, don't let the "pending delete" filter hide it
-        if (created.id) this.pendingDeletedProjectIds.delete(created.id);
-
-        // ✅ Optimistically show it immediately
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        this.projects = [created, ...(this.projects ?? []).filter(p => p.id !== created.id)];
-
-        this.loadProjects();
-        // ✅ keep RHS blank until the router loads the selected project
+        this.projects = [created, ...this.projects];
         this.activePanel = 'compose';
         void this.router.navigate(['/mail', created.id]);
       },
@@ -311,42 +334,8 @@ export class MailDashboardComponent implements OnInit {
   }
 
   deleteCurrentProject(): void {
-    if (!this.projectId) return;
-    if (this.deletingProject) return;
-
-    const deletingId = this.projectId;
-
-    const ok = window.confirm('Delete this project?');
-    if (!ok) return;
-
-    this.deletingProject = true;
-
-    // ✅ hide in UI while delete is happening
-    this.pendingDeletedProjectIds.add(deletingId);
-
-    // ✅ Optimistically remove from sidebar immediately
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    this.projects = (this.projects ?? []).filter(p => p.id !== deletingId);
-
-    // ✅ Immediately leave /mail/:id so we never try to load a deleted project
-    this.clearEditorState();
-    void this.router.navigate(['/mail']);
-
-    // ✅ Then delete on the backend + refresh list
-    this.projectService.delete(deletingId).subscribe({
-      next: () => {
-        // ✅ deletion finished, stop hiding the id
-        this.pendingDeletedProjectIds.delete(deletingId);
-        this.deletingProject = false;
-        this.loadProjects();
-      },
-      error: err => {
-        console.error('❌ Failed to delete project', err);
-        this.pendingDeletedProjectIds.delete(deletingId);
-        this.deletingProject = false;
-        this.loadProjects();
-      },
-    });
+    if (!this.projectId || this.deletingProject) return;
+    this.deleteConfirmOpen = true;
   }
 
   private clearEditorState(): void {
@@ -362,6 +351,8 @@ export class MailDashboardComponent implements OnInit {
     this.deletedAttachmentIds = [];
     this.attachmentsLoading = false;
     this.sendMenuOpen = false;
+    this.spreadsheetMenuOpen = false;
+    this.spreadsheetPreviewOpen = false;
 
     this.removeSpreadsheet();
     this.previewEmails = [];
@@ -420,6 +411,18 @@ export class MailDashboardComponent implements OnInit {
 
     if (this.activePanel === 'preview') {
       this.previewMerge();
+      return;
+    }
+
+    // ✅ when opening signature panel, load saved signature into the editor
+    if (this.activePanel === 'signature') {
+      setTimeout(() => {
+        const el = document.getElementById('signatureEditor');
+        if (el) {
+          el.innerHTML = this.convertMarkdownToHtml(this.signatureSaved || '');
+          el.focus();
+        }
+      });
       return;
     }
 
@@ -512,6 +515,9 @@ export class MailDashboardComponent implements OnInit {
     this.oneDriveFiles = [];
     this.oneDriveLoading = false;
     this.oneDriveError = null;
+
+    this.spreadsheetMenuOpen = false;
+    this.spreadsheetPreviewOpen = false;
 
     if (this.mergeFileInput?.nativeElement) {
       this.mergeFileInput.nativeElement.value = '';
@@ -695,6 +701,203 @@ export class MailDashboardComponent implements OnInit {
   }
 
   // -----------------------
+  // Email validation helpers
+  // -----------------------
+
+  private isTokenTemplate(s: string): boolean {
+    return /{{\s*[^}]+\s*}}/.test(s || '');
+  }
+
+  // A pragmatic email validator (good UX). Not RFC-perfect, but catches obvious bad inputs.
+  private isValidEmail(email: string): boolean {
+    const e = (email || '').trim();
+    if (!e) return false;
+    if (e.length > 254) return false;
+
+    // no spaces
+    if (/\s/.test(e)) return false;
+
+    // basic structure
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!re.test(e)) return false;
+
+    // domain must have a dot and not end with dot
+    const parts = e.split('@');
+    const domain = parts[1] || '';
+    if (!domain.includes('.')) return false;
+    if (domain.endsWith('.')) return false;
+
+    return true;
+  }
+
+  // Replace {{token}} occurrences using a row object
+  private replaceTokens(template: string, row: Record<string, string>): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    let out = template ?? '';
+
+    Object.entries(row).forEach(([key, value]) => {
+      const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`{{\\s*${safeKey}\\s*}}`, 'g');
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      out = out.replace(regex, String(value ?? ''));
+    });
+
+    return out;
+  }
+
+  /**
+   * Validates the "To" field for:
+   * - literal email(s) (comma/semicolon separated)
+   * - token templates like {{email}}
+   * And catches wrong token usage like {{name}} that resolves to a non-email value.
+   */
+  private validateToForAllRows(): { ok: true } | { ok: false; message: string } {
+    const toTemplate = (this.toField || '').trim();
+    if (!toTemplate) {
+      return { ok: false, message: 'The “To” field is required.' };
+    }
+
+    // If To contains tokens, validate by row
+    if (this.isTokenTemplate(toTemplate)) {
+      // Need spreadsheet rows to validate token resolution
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!this.spreadsheetRows || this.spreadsheetRows.length === 0) {
+        return { ok: false, message: 'Connect a spreadsheet so “To” tokens can be validated.' };
+      }
+
+      // Extract token keys used in the To template (for better error messaging)
+      const tokenKeys = Array.from(toTemplate.matchAll(/{{\s*([^}]+)\s*}}/g)).map(m => (m[1] || '').trim());
+
+      for (let i = 0; i < this.spreadsheetRows.length; i++) {
+        const row = this.spreadsheetRows[i];
+        const resolved = this.replaceTokens(toTemplate, row).trim();
+
+        // If template uses tokens but none of them ever produce an email,
+        // it's very likely the user used the wrong column (e.g. {{name}}).
+        const anyTokenProducedEmail = tokenKeys.some(k => this.isValidEmail(String((row as any)[k] ?? '').trim()));
+        if (!anyTokenProducedEmail) {
+          return {
+            ok: false,
+            message: `Row ${i + 1}: “To” must resolve to an email address. It looks like you used a non-email column (e.g. {{name}}). Use an email column such as {{email}}.`,
+          };
+        }
+
+        // Now validate resolved output supports multiple recipients too
+        const recipients = resolved
+          .split(/[;,]/)
+          .map(s => s.trim())
+          .filter(Boolean);
+
+        if (recipients.length === 0) {
+          return { ok: false, message: `Row ${i + 1}: “To” resolved to empty. Check your tokens.` };
+        }
+
+        const bad = recipients.find(r => !this.isValidEmail(r));
+        if (bad) {
+          return {
+            ok: false,
+            message: `Row ${i + 1}: invalid email in “To” after token replacement: “${bad}”.`,
+          };
+        }
+      }
+
+      return { ok: true };
+    }
+
+    // Literal email(s) case (no tokens)
+    const recipients = toTemplate
+      .split(/[;,]/)
+      .map(s => s.trim())
+      .filter(Boolean);
+
+    if (recipients.length === 0) {
+      return { ok: false, message: 'The “To” field must contain at least one email address.' };
+    }
+
+    const bad = recipients.find(r => !this.isValidEmail(r));
+    if (bad) {
+      return { ok: false, message: `Invalid email in “To”: “${bad}”.` };
+    }
+
+    return { ok: true };
+  }
+
+  // Optional: small helper so send/test share the same guard
+  private guardBeforeSendOrTest(): boolean {
+    // Sync editors → model
+    this.onEditorInput('to');
+    this.onEditorInput('cc');
+    this.onEditorInput('bcc');
+
+    // To = REQUIRED
+    const toResult = this.validateEmailFieldForAllRows('to', true);
+    if (!toResult.ok) {
+      this.showValidationError(toResult.message);
+      return false;
+    }
+
+    // Cc = OPTIONAL
+    const ccResult = this.validateEmailFieldForAllRows('cc', false);
+    if (!ccResult.ok) {
+      this.showValidationError(ccResult.message);
+      return false;
+    }
+
+    // Bcc = OPTIONAL
+    const bccResult = this.validateEmailFieldForAllRows('bcc', false);
+    if (!bccResult.ok) {
+      this.showValidationError(bccResult.message);
+      return false;
+    }
+
+    return true;
+  }
+
+  private validateEmailFieldForAllRows(field: 'to' | 'cc' | 'bcc', required: boolean): { ok: true } | { ok: false; message: string } {
+    const template = field === 'to' ? this.toField : field === 'cc' ? this.ccField : this.bccField;
+
+    if (!template.trim()) {
+      return required ? { ok: false, message: 'The “To” field is required.' } : { ok: true };
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (!this.spreadsheetRows || this.spreadsheetRows.length === 0) {
+      return { ok: true };
+    }
+
+    for (let i = 0; i < this.spreadsheetRows.length; i++) {
+      const row = this.spreadsheetRows[i];
+      const resolved = this.replaceTokens(template, row).trim();
+
+      if (!resolved) {
+        if (required) {
+          return {
+            ok: false,
+            message: `Row ${i + 1}: “To” resolves to empty. Use a valid email column.`,
+          };
+        }
+        continue;
+      }
+
+      const emails = resolved
+        .split(',')
+        .map(e => e.trim())
+        .filter(Boolean);
+
+      for (const email of emails) {
+        if (!this.isValidEmail(email)) {
+          return {
+            ok: false,
+            message: `Row ${i + 1}: Invalid email in ${field.toUpperCase()}: “${email}”`,
+          };
+        }
+      }
+    }
+
+    return { ok: true };
+  }
+
+  // -----------------------
   // Save & send
   // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -819,13 +1022,23 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   testProject(): void {
+    this.testErr.set(false); // in testProject()
+    this.mergeErr.set(false); // in sendProject()
     if (!this.projectId || !this.mergeFile) {
       this.testErr.set(true);
+      this.showToast('warn', 'Connect a spreadsheet before sending a test email.');
       return;
     }
+
     if (this.attachmentsLoading) {
-      alert('Attachments are still loading, please wait a moment.');
+      this.showToast('warn', 'Attachments are still loading, please wait a moment.');
       return;
+    }
+
+    // ✅ NEW: validate To (including token resolution)
+    // ✅ NEW: validate To (including token resolution)
+    if (!this.guardBeforeSendOrTest()) {
+      return; // ⬅ stop cleanly, no stuck UI
     }
 
     this.testSending.set(true);
@@ -856,12 +1069,14 @@ export class MailDashboardComponent implements OnInit {
           next: () => {
             this.testSending.set(false);
             this.testSuccess = true;
+            this.showToast('ok', 'Test email sent.');
             setTimeout(() => (this.testSuccess = false), 3000);
           },
           error: err => {
             console.error('❌ Test send failed', err);
             this.testSending.set(false);
             this.testErr.set(true);
+            this.showToast('error', 'Test send failed. Please try again.');
           },
         });
       },
@@ -869,19 +1084,30 @@ export class MailDashboardComponent implements OnInit {
         console.error('❌ Save-before-test failed', err);
         this.testSending.set(false);
         this.testErr.set(true);
+        this.showToast('error', 'Could not save before test send.');
       },
     });
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   sendProject(): void {
+    this.testErr.set(false); // in testProject()
+    this.mergeErr.set(false); // in sendProject()
     if (!this.projectId || !this.mergeFile) {
       this.mergeErr.set(true);
+      this.showToast('warn', 'Connect a spreadsheet before sending.');
       return;
     }
+
     if (this.attachmentsLoading) {
-      alert('Attachments are still loading, please wait a moment.');
+      this.showToast('warn', 'Attachments are still loading, please wait a moment.');
       return;
+    }
+
+    // ✅ NEW: validate To (including token resolution)
+    // ✅ NEW: validate To (including token resolution)
+    if (!this.guardBeforeSendOrTest()) {
+      return; // ⬅ clean exit
     }
 
     this.mergeSending.set(true);
@@ -917,6 +1143,7 @@ export class MailDashboardComponent implements OnInit {
           next: () => {
             this.mergeSending.set(false);
             this.sendSuccess = true;
+
             if (this.projectId) {
               const updatedProject: Project = {
                 ...(this.project ?? {}),
@@ -935,22 +1162,21 @@ export class MailDashboardComponent implements OnInit {
                 bccField: this.bccField ?? '',
                 spreadsheetLink: this.spreadsheetBase64 ?? null,
                 spreadsheetFileContentType: this.spreadsheetFileContentType ?? null,
-
-                // ✅ keep filename when marking sent
                 spreadsheetName: this.connectedSpreadsheetName,
-
                 status: 'SENT',
                 sentAt: new Date().toISOString(),
               };
 
               this.projectService.update(updatedProject).subscribe(() => this.loadProjects());
             }
+
             setTimeout(() => (this.sendSuccess = false), 3000);
           },
           error: err => {
             console.error('❌ Send failed', err);
             this.mergeSending.set(false);
             this.mergeErr.set(true);
+            this.showToast('error', 'Send failed. Please try again.');
           },
         });
       },
@@ -958,6 +1184,7 @@ export class MailDashboardComponent implements OnInit {
         console.error('❌ Save-before-send failed', err);
         this.mergeSending.set(false);
         this.mergeErr.set(true);
+        this.showToast('error', 'Could not save before sending.');
       },
     });
   }
@@ -1071,7 +1298,17 @@ export class MailDashboardComponent implements OnInit {
       if (this.sendingTotal > 0 && this.sendingProgress >= this.sendingTotal) {
         this.sendingInProgress = false;
         this.sendingFinished = true;
-        setTimeout(() => (this.sendingFinished = false), 5000);
+
+        // ✅ keep it visible for 2s after completion
+        if (this.sendingFinishedTimeoutId) {
+          clearTimeout(this.sendingFinishedTimeoutId);
+          this.sendingFinishedTimeoutId = null;
+        }
+
+        this.sendingFinishedTimeoutId = setTimeout(() => {
+          this.sendingFinished = false;
+          this.sendingFinishedTimeoutId = null;
+        }, 2000);
       }
     });
 
@@ -1088,22 +1325,34 @@ export class MailDashboardComponent implements OnInit {
     const selectedTone = tone === 'custom' ? this.customTone : tone;
     if (!selectedTone.trim()) return;
 
+    // ✅ Protect links/images (esp. data: base64 images) before sending to AI
+    const { safeText, map } = this.protectRichContentForAi(this.mergeBodyTemplate);
+    this.lastAiPlaceholderMap = map;
+
     this.isRewriting = true;
     this.aiSelectedTone = tone;
     this.aiRewrittenText = '';
     this.aiRewrittenPreview = null;
 
-    this.aiRewriteService.rewrite(this.mergeBodyTemplate, selectedTone).subscribe({
+    this.aiRewriteService.rewrite(safeText, selectedTone).subscribe({
       next: res => {
         // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        this.aiRewrittenText = res.rewrittenText ?? '';
-        const html = this.convertMarkdownToHtml(this.aiRewrittenText || '');
+        const rewritten = res.rewrittenText ?? '';
+
+        // ✅ Restore protected links/images back into the rewritten markdown
+        this.aiRewrittenText = this.restoreRichContentFromAi(rewritten, this.lastAiPlaceholderMap);
+
+        // ✅ Convert to HTML and decorate merge tokens for consistent UI
+        let html = this.convertMarkdownToHtml(this.aiRewrittenText || '');
+        html = this.decorateTokensInHtml(html);
+
         this.aiRewrittenPreview = this.sanitizer.bypassSecurityTrustHtml(html);
         this.isRewriting = false;
       },
       error: () => {
-        alert('AI rewriting failed. Try again.');
+        this.showToast('error', 'AI rewriting failed. Try again.');
         this.isRewriting = false;
+        this.lastAiPlaceholderMap = null;
       },
     });
   }
@@ -1112,12 +1361,84 @@ export class MailDashboardComponent implements OnInit {
   applyRewrittenEmail(): void {
     if (!this.aiRewrittenText) return;
 
+    // ✅ Only update the body. Do NOT touch subject/to/cc/bcc.
     this.mergeBodyTemplate = this.aiRewrittenText;
-    setTimeout(() => this.renderTokens('body'));
+
+    // ✅ Clear placeholder map once applied
+    this.lastAiPlaceholderMap = null;
+
+    // ✅ Refresh preview model
     this.previewMerge();
 
-    // ✅ after applying, return user to compose view
+    // ✅ Return to compose view
     this.activePanel = 'compose';
+
+    // ✅ Critical: contenteditable fields need to be re-hydrated after panel swap
+    // (otherwise they look empty even though TS fields still have values)
+    setTimeout(() => {
+      (['to', 'cc', 'bcc', 'subject', 'body'] as MergeField[]).forEach(f => this.renderTokens(f));
+    }, 0);
+  }
+
+  // -----------------------
+  // AI rewrite: protect rich content (links/images) with placeholders
+  // -----------------------
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private lastAiPlaceholderMap: Record<string, string> | null = null;
+
+  private protectRichContentForAi(md: string): { safeText: string; map: Record<string, string> } {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    let text = md ?? '';
+    const map: Record<string, string> = {};
+    let linkIdx = 0;
+    let imgIdx = 0;
+
+    // 1) Protect HTML <img ...> (especially data: URLs)
+    // Keep the entire tag so you restore exactly what the editor had.
+    text = text.replace(/<img\b[^>]*>/gi, m => {
+      imgIdx++;
+      const token = `⟦MM_IMG_${imgIdx}⟧`;
+      map[token] = m;
+      return token;
+    });
+
+    // 2) Protect HTML links: <a href="https://...">text</a>
+    // Convert to your markdown format so it round-trips through convertMarkdownToHtml().
+    text = text.replace(/<a\b[^>]*href="(https:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi, (_m, url: string, label: string) => {
+      linkIdx++;
+      const token = `⟦MM_LINK_${linkIdx}⟧`;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const cleanLabel = String(label ?? '')
+        .replace(/\s+/g, ' ')
+        .trim();
+      map[token] = `[${cleanLabel || url}](${url})`;
+      return token;
+    });
+
+    // 3) Protect Markdown links: [text](https://...)
+    text = text.replace(/\[([^\]]+)\]\((https:\/\/[^\s)]+)\)/g, (_m, label: string, url: string) => {
+      linkIdx++;
+      const token = `⟦MM_LINK_${linkIdx}⟧`;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      map[token] = `[${String(label ?? '').trim() || url}](${url})`;
+      return token;
+    });
+
+    return { safeText: text, map };
+  }
+
+  private restoreRichContentFromAi(md: string, map: Record<string, string> | null): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    let out = md ?? '';
+    if (!map) return out;
+
+    // Replace tokens back to original markup
+    Object.keys(map).forEach(token => {
+      // replaceAll without needing ES2021 lib assumption
+      out = out.split(token).join(map[token]);
+    });
+
+    return out;
   }
 
   // -----------------------
@@ -1130,8 +1451,13 @@ export class MailDashboardComponent implements OnInit {
     const el = document.getElementById(this.getElementId(field));
     if (!el) return;
 
+    // ✅ NEW: convert a freshly typed {{token}} into a chip *in-place* (no full rerender)
+    // This avoids caret jumping / "weird" behaviour.
+    this.tryConvertTypedTokenAtCaret(field, el);
+
     let html = el.innerHTML;
 
+    // Keep your existing span->{{}} normalization
     html = html.replace(/<span[^>]*class="merge-token"[^>]*data-field="([^"]+)"[^>]*>.*?<\/span>/gi, '{{$1}}');
 
     const markdown = this.htmlToMarkdown(html);
@@ -1166,15 +1492,183 @@ export class MailDashboardComponent implements OnInit {
 
     let html = this.convertMarkdownToHtml(md);
 
-    html = html.replace(
-      /{{\s*([^}]+)\s*}}/g,
-      (_, key: string) =>
-        `<span class="merge-token" data-field="${key}" contenteditable="false" style="background:${this.getColorForField(
-          key,
-        )}">${key}</span>`,
-    );
+    // ✅ Only wrap tokens that match a spreadsheet header
+    html = html.replace(/{{\s*([^}]+)\s*}}/g, (_m, rawKey: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const key = String(rawKey ?? '').trim();
+      if (!this.isKnownMergeField(key)) {
+        return `{{${key}}}`; // leave as plain text
+      }
+      return `<span class="merge-token" data-field="${this.escapeAttr(key)}" contenteditable="false" style="background:${this.getColorForField(
+        key,
+      )}">${this.escapeHtml(key)}</span>`;
+    });
 
     el.innerHTML = html;
+  }
+
+  private decorateTokensInHtml(html: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const src = html ?? '';
+
+    return src.replace(/{{\s*([^}]+)\s*}}/g, (_m, rawKey: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const key = String(rawKey ?? '').trim();
+      if (!this.isKnownMergeField(key)) return `{{${key}}}`;
+
+      return `<span class="merge-token" data-field="${this.escapeAttr(key)}" contenteditable="false" style="background:${this.getColorForField(
+        key,
+      )}">${this.escapeHtml(key)}</span>`;
+    });
+  }
+
+  // Prevent recursion during DOM mutation
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private autoTokenInsertInProgress = false;
+
+  private isKnownMergeField(key: string): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const k = (key ?? '').trim();
+
+    return !!k && Array.isArray(this.spreadsheetHeaders) && this.spreadsheetHeaders.includes(k);
+  }
+
+  private escapeAttr(s: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    return String(s ?? '').replace(/"/g, '&quot;');
+  }
+
+  private escapeHtml(s: string): string {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    return String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+  }
+
+  /**
+   * If user just typed a token like {{name}} and "name" is a known merge field,
+   * replace that exact text range with a <span class="merge-token"> chip WITHOUT re-rendering the whole editor.
+   *
+   * This is what prevents the "weird" contenteditable behaviour.
+   */
+  private tryConvertTypedTokenAtCaret(field: MergeField, rootEl: HTMLElement): void {
+    // Only do this when a spreadsheet exists (because merge fields come from headers)
+    if (!this.spreadsheetHeaders.length) return;
+    if (this.autoTokenInsertInProgress) return;
+
+    const sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0) return;
+
+    const caretRange = sel.getRangeAt(0);
+    if (!caretRange.collapsed) return;
+
+    // Ensure caret is inside the current editor element
+    const common = caretRange.commonAncestorContainer;
+    const commonEl = common instanceof Element ? common : common.parentElement;
+    if (!commonEl || !rootEl.contains(commonEl)) return;
+
+    // Build text from start of editor -> caret (kept small-ish)
+    const pre = document.createRange();
+    pre.selectNodeContents(rootEl);
+    pre.setEnd(caretRange.endContainer, caretRange.endOffset);
+
+    const preText = pre.toString();
+    if (!preText) return;
+
+    // Only trigger when the user closes a token with }}
+    if (!preText.endsWith('}}')) return;
+
+    // Grab the tail to search (avoid huge strings)
+    const tail = preText.slice(Math.max(0, preText.length - 200));
+
+    // Match a token at the very end: {{ something }}
+    // - disallow braces inside
+    // - allow spaces in the token name (if your headers can have spaces)
+    const m = tail.match(/{{\s*([^{}]+?)\s*}}$/);
+    if (!m) return;
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const key = (m[1] ?? '').trim();
+    if (!this.isKnownMergeField(key)) return;
+
+    const matchLen = m[0].length;
+    const tokenEndGlobal = preText.length;
+    const tokenStartGlobal = tokenEndGlobal - matchLen;
+
+    // Build a DOM range covering exactly the token text (best-effort for typical typing)
+    const tokenRange = this.makeRangeFromTextOffsets(rootEl, tokenStartGlobal, tokenEndGlobal);
+    if (!tokenRange) return;
+
+    this.autoTokenInsertInProgress = true;
+    try {
+      // Replace token text with the chip
+      const span = document.createElement('span');
+      span.className = 'merge-token';
+      span.setAttribute('data-field', key);
+      span.setAttribute('contenteditable', 'false');
+      span.setAttribute('style', `background:${this.getColorForField(key)}`);
+      span.textContent = key;
+
+      tokenRange.deleteContents();
+      tokenRange.insertNode(span);
+
+      // Add a trailing space so the user can continue typing naturally
+      const space = document.createTextNode('\u00A0');
+      span.after(space);
+
+      // Move caret after the inserted space
+      const newRange = document.createRange();
+      newRange.setStartAfter(space);
+      newRange.collapse(true);
+
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } finally {
+      this.autoTokenInsertInProgress = false;
+    }
+  }
+
+  /**
+   * Map "text offsets within rootEl's visible text" -> DOM Range.
+   * Note: This is best-effort and works well for normal typing in your editors.
+   */
+  private makeRangeFromTextOffsets(rootEl: HTMLElement, start: number, end: number): Range | null {
+    if (start < 0 || end < start) return null;
+
+    const tw = document.createTreeWalker(rootEl, NodeFilter.SHOW_TEXT);
+    let current: Node | null = tw.nextNode();
+    let pos = 0;
+
+    let startNode: Text | null = null;
+    let startOffset = 0;
+    let endNode: Text | null = null;
+    let endOffset = 0;
+
+    while (current) {
+      const t = current as Text;
+      const len = t.data.length;
+
+      if (!startNode && pos + len >= start) {
+        startNode = t;
+        startOffset = Math.max(0, start - pos);
+      }
+      if (pos + len >= end) {
+        endNode = t;
+        endOffset = Math.max(0, end - pos);
+        break;
+      }
+
+      pos += len;
+      current = tw.nextNode();
+    }
+
+    if (!startNode || !endNode) return null;
+
+    const r = document.createRange();
+    r.setStart(startNode, startOffset);
+    r.setEnd(endNode, endOffset);
+    return r;
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -1204,6 +1698,11 @@ export class MailDashboardComponent implements OnInit {
 
     event.preventDefault();
     event.stopPropagation();
+
+    // Restore last known selection (clicking toolbar steals focus)
+    this.restoreBodySelection();
+
+    // Apply formatting
     this.applyFormatting(type);
   }
 
@@ -1214,32 +1713,257 @@ export class MailDashboardComponent implements OnInit {
     const bodyEl = document.getElementById('mergeBody');
     if (!bodyEl) return;
 
+    bodyEl.focus();
+
     const sel = window.getSelection();
-    if (!sel || sel.rangeCount === 0 || !sel.toString().trim()) return;
+    if (!sel || sel.rangeCount === 0) return;
 
-    const command = type === 'bold' ? 'bold' : type === 'italic' ? 'italic' : 'underline';
+    // If user just has a caret, select the word under caret (so toggling works)
+    this.expandSelectionToWordIfCollapsed(sel, bodyEl);
 
-    // eslint-disable-next-line @typescript-eslint/no-deprecated
-    document.execCommand(command, false);
+    if (!sel.toString()) return;
 
-    let html = bodyEl.innerHTML;
-    html = html.replace(/<span[^>]*class="merge-token"[^>]*data-field="([^"]+)"[^>]*>.*?<\/span>/gi, '{{$1}}');
+    // Ensure selection is inside mergeBody
+    const range = sel.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    const commonEl = common instanceof Element ? common : common.parentElement;
+    if (!commonEl || !bodyEl.contains(commonEl)) return;
 
-    this.mergeBodyTemplate = this.htmlToMarkdown(html);
-    this.renderTokens('body');
+    if (type === 'bold') {
+      // ✅ Deterministic bold toggle (no execCommand)
+      this.toggleStrongOnSelection(sel, bodyEl);
+    } else {
+      // Keep existing behaviour for italic/underline (they’re working)
+      const command = type === 'italic' ? 'italic' : 'underline';
+      // eslint-disable-next-line @typescript-eslint/no-deprecated
+      document.execCommand(command, false);
+    }
+
+    // Save selection AFTER changes
+    this.saveBodySelection();
+
+    // Sync editor -> markdown
+    this.onEditorInput('body');
+
+    // Keep preview updated
     this.previewMerge();
+  }
+
+  /**
+   * Toggle <strong> on current selection deterministically:
+   * - If selection is fully bold (all within <strong>) -> unwrap strong within selection
+   * - Else -> wrap selection in <strong>
+   */
+  private toggleStrongOnSelection(sel: Selection, bodyEl: HTMLElement): void {
+    if (!sel.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+    if (range.collapsed) return;
+
+    // If selection is already fully within <strong>, unwrap; otherwise wrap.
+    const fullyBold = this.selectionIsFullyInStrong(range, bodyEl);
+
+    if (fullyBold) {
+      this.unwrapStrongInRange(range, bodyEl);
+    } else {
+      this.wrapRangeWithStrong(range);
+    }
+
+    // Re-establish selection to cover the same visual content
+    // (Range objects can get stale after DOM ops)
+    try {
+      sel.removeAllRanges();
+      sel.addRange(range);
+    } catch {
+      // ignore
+    }
+  }
+
+  private selectionIsFullyInStrong(range: Range, root: HTMLElement): boolean {
+    // Quick heuristic:
+    // - Check start and end containers are within <strong>
+    // - And any text nodes inside the range are also within <strong>
+    const startStrong = this.closestTag(range.startContainer, 'STRONG', root);
+    const endStrong = this.closestTag(range.endContainer, 'STRONG', root);
+    if (!startStrong || !endStrong) return false;
+
+    // Walk text nodes in range and ensure each one is inside a STRONG
+    const walker = document.createTreeWalker(range.commonAncestorContainer, NodeFilter.SHOW_TEXT, {
+      acceptNode(node: Node) {
+        if (!(node instanceof Text)) return NodeFilter.FILTER_REJECT;
+        if (!node.data.trim()) return NodeFilter.FILTER_REJECT;
+
+        // Check node intersects the range
+        const nodeRange = document.createRange();
+        nodeRange.selectNodeContents(node);
+
+        const intersects =
+          range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0 && range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0;
+
+        return intersects ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    } as any);
+
+    let n: Node | null;
+    while ((n = walker.nextNode())) {
+      const strong = this.closestTag(n, 'STRONG', root);
+      if (!strong) return false;
+    }
+
+    return true;
+  }
+
+  private wrapRangeWithStrong(range: Range): void {
+    // Extract contents and wrap in <strong>
+    const strong = document.createElement('strong');
+    const frag = range.extractContents();
+    strong.appendChild(frag);
+    range.insertNode(strong);
+
+    // Update range to select inside the new strong
+    range.selectNodeContents(strong);
+  }
+
+  private unwrapStrongInRange(range: Range, root: HTMLElement): void {
+    // Find all STRONG elements that intersect the range and unwrap them
+    const strongs = Array.from(root.querySelectorAll('strong')).filter(s => this.nodeIntersectsRange(s, range));
+    strongs.forEach(s => this.unwrapElement(s));
+  }
+
+  private unwrapElement(el: HTMLElement): void {
+    const parent = el.parentNode;
+    if (!parent) return;
+
+    while (el.firstChild) {
+      parent.insertBefore(el.firstChild, el);
+    }
+    parent.removeChild(el);
+  }
+
+  private nodeIntersectsRange(node: Node, range: Range): boolean {
+    const nodeRange = document.createRange();
+    try {
+      nodeRange.selectNode(node);
+    } catch {
+      // some nodes can't be selected; fallback to contents
+      nodeRange.selectNodeContents(node);
+    }
+
+    return range.compareBoundaryPoints(Range.END_TO_START, nodeRange) < 0 && range.compareBoundaryPoints(Range.START_TO_END, nodeRange) > 0;
+  }
+
+  private closestTag(node: Node, tag: string, stopAt: HTMLElement): HTMLElement | null {
+    let cur: Node | null = node instanceof Element ? node : node.parentNode;
+    while (cur && cur !== stopAt) {
+      if (cur instanceof HTMLElement && cur.tagName === tag) return cur;
+      cur = cur.parentNode;
+    }
+    // also allow the stopAt itself
+    if (stopAt.tagName === tag) return stopAt;
+    return null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  protected saveBodySelection(): void {
+    const bodyEl = document.getElementById('mergeBody');
+    const sel = window.getSelection();
+    if (!bodyEl || !sel || sel.rangeCount === 0) return;
+
+    const range = sel.getRangeAt(0);
+    const common = range.commonAncestorContainer;
+    const commonEl = common instanceof Element ? common : common.parentElement;
+
+    if (commonEl && bodyEl.contains(commonEl)) {
+      this.savedBodyRange = range.cloneRange();
+    }
+  }
+
+  private restoreBodySelection(): void {
+    const bodyEl = document.getElementById('mergeBody');
+    const sel = window.getSelection();
+    if (!bodyEl || !sel || !this.savedBodyRange) return;
+
+    bodyEl.focus();
+
+    try {
+      sel.removeAllRanges();
+      sel.addRange(this.savedBodyRange);
+    } catch {
+      // If the DOM changed and the saved range became invalid, just drop it.
+      this.savedBodyRange = null;
+    }
+  }
+
+  private expandSelectionToWordIfCollapsed(sel: Selection, bodyEl: HTMLElement): void {
+    if (!sel.rangeCount) return;
+
+    const range = sel.getRangeAt(0);
+    if (!range.collapsed) return;
+
+    // Make sure caret is inside mergeBody
+    const common = range.commonAncestorContainer;
+    const commonEl = common instanceof Element ? common : common.parentElement;
+    if (!commonEl || !bodyEl.contains(commonEl)) return;
+
+    // We only handle the common case: caret is in a Text node
+    const node = range.startContainer;
+    if (!(node instanceof Text)) return;
+
+    const text = node.data;
+    const idx = range.startOffset;
+
+    if (!text || idx < 0 || idx > text.length) return;
+
+    // Find word boundaries around caret
+    // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+    const isWordChar = (c: string) => /[A-Za-z0-9_]/.test(c);
+
+    let start = idx;
+    let end = idx;
+
+    // If caret is between characters, try to snap into a word
+    if (start > 0 && !isWordChar(text[start]) && isWordChar(text[start - 1])) start--;
+
+    while (start > 0 && isWordChar(text[start - 1])) start--;
+    while (end < text.length && isWordChar(text[end])) end++;
+
+    if (start === end) return; // no word found
+
+    const wordRange = document.createRange();
+    wordRange.setStart(node, start);
+    wordRange.setEnd(node, end);
+
+    sel.removeAllRanges();
+    sel.addRange(wordRange);
+
+    // Also store it so toolbar click can restore it reliably
+    this.savedBodyRange = wordRange.cloneRange();
   }
 
   private htmlToMarkdown(html: string): string {
     return (
-      html
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      (html ?? '')
         // ✅ HTTPS-only: <a href="https://...">text</a> -> [text](https://...)
         .replace(/<a[^>]*href="(https:\/\/[^"]+)"[^>]*>(.*?)<\/a>/gi, '[$2]($1)')
+
+        // ✅ Handle span-based formatting produced by execCommand in some browsers
+        // Bold spans: font-weight: bold / 700 / 800 / 900
+        // Bold spans: font-weight: bold / 600 / 700 / 800 / 900
+        .replace(/<span[^>]*style="[^"]*font-weight\s*:\s*(bold|600|700|800|900)[^"]*"[^>]*>(.*?)<\/span>/gi, '**$2**')
+        // Italic spans
+        .replace(/<span[^>]*style="[^"]*font-style\s*:\s*italic[^"]*"[^>]*>(.*?)<\/span>/gi, '_$1_')
+        // Underline spans
+        .replace(/<span[^>]*style="[^"]*text-decoration\s*:\s*underline[^"]*"[^>]*>(.*?)<\/span>/gi, '~$1~')
+
+        // ✅ Normal tag-based formatting
         .replace(/<strong[^>]*>(.*?)<\/strong>/gi, '**$1**')
         .replace(/<b[^>]*>(.*?)<\/b>/gi, '**$1**')
         .replace(/<i[^>]*>(.*?)<\/i>/gi, '_$1_')
         .replace(/<em[^>]*>(.*?)<\/em>/gi, '_$1_')
         .replace(/<u[^>]*>(.*?)<\/u>/gi, '~$1~')
+
+        // Line breaks / spacing
         .replace(/<br\s*\/?>/gi, '\n')
         .replace(/&nbsp;/g, ' ')
         .trim()
@@ -1480,6 +2204,38 @@ export class MailDashboardComponent implements OnInit {
     return this.oneDriveSpreadsheetName ?? this.mergeFile?.name ?? this.mergeFileName ?? 'Spreadsheet';
   }
 
+  // -----------------------
+  // Spreadsheet dropdown (Send/Save style) + preview toggle
+  // -----------------------
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleSpreadsheetMenu(): void {
+    if (!this.hasSelectedProject) return;
+    this.spreadsheetMenuOpen = !this.spreadsheetMenuOpen;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  chooseSpreadsheet(source: 'LOCAL' | 'ONEDRIVE'): void {
+    if (!this.hasSelectedProject) return;
+
+    // close menu first
+    this.spreadsheetMenuOpen = false;
+
+    // use your existing plumbing
+    this.setSpreadsheetSource(source);
+    this.connectSpreadsheet();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleSpreadsheetPreview(event?: Event): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (!this.hasSelectedProject) return;
+    if (!this.hasConnectedSpreadsheet) return;
+
+    this.spreadsheetPreviewOpen = !this.spreadsheetPreviewOpen;
+  }
+
   // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleBcc(): void {
     if (!this.hasSelectedProject) return;
@@ -1501,10 +2257,12 @@ export class MailDashboardComponent implements OnInit {
 
     if (!this.projectId || !this.mergeFile) {
       this.mergeErr.set(true);
+      this.showToast('warn', 'Connect a spreadsheet before sending.');
       return;
     }
+
     if (this.attachmentsLoading) {
-      alert('Attachments are still loading, please wait a moment.');
+      this.showToast('warn', 'Attachments are still loading, please wait a moment.');
       return;
     }
 
@@ -1534,10 +2292,12 @@ export class MailDashboardComponent implements OnInit {
 
       if (!this.projectId || !this.mergeFile) {
         this.mergeErr.set(true);
+        this.showToast('warn', 'Connect a spreadsheet before sending.');
         return;
       }
+
       if (this.attachmentsLoading) {
-        alert('Attachments are still loading, please wait a moment.');
+        this.showToast('warn', 'Attachments are still loading, please wait a moment.');
         return;
       }
 
@@ -1581,8 +2341,8 @@ export class MailDashboardComponent implements OnInit {
     this.signatureService.update(sig).subscribe({
       next: () => {
         this.signatureSaved = sig;
-        this.applySignatureToBody();
-        this.signaturePanelOpen = false;
+        this.applySignatureToBody(); // already sets activePanel = 'compose'
+        // (no signaturePanelOpen anymore)
       },
       error: err => console.error('❌ Failed to save signature', err),
     });
@@ -1671,18 +2431,7 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   toggleSignaturePanel(): void {
-    this.signaturePanelOpen = !this.signaturePanelOpen;
-
-    if (this.signaturePanelOpen) {
-      setTimeout(() => {
-        const el = document.getElementById('signatureEditor');
-        if (el) {
-          // load the saved signature into editor
-          el.innerHTML = this.convertMarkdownToHtml(this.signatureSaved || '');
-          el.focus();
-        }
-      });
-    }
+    this.setPanel('signature');
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -1738,27 +2487,64 @@ export class MailDashboardComponent implements OnInit {
     const sel = window.getSelection();
     if (!sel || sel.rangeCount === 0) return;
 
-    const selectedText = sel.toString().trim();
-
-    if (!selectedText) {
-      alert('Please select the text you want to turn into a link.');
+    const text = sel.toString().trim();
+    if (!text) {
+      // no alert() — just do nothing or show a subtle hint if you want
       return;
     }
 
-    const url = (prompt('Enter HTTPS URL (must start with https://)') ?? '').trim();
-    if (!url) return;
+    // Save the selection range so we can insert later even after focusing the modal input
+    this.savedLinkRange = sel.getRangeAt(0).cloneRange();
+
+    this.linkTextDraft = text;
+    this.linkUrlDraft = 'https://';
+    this.linkError = null;
+    this.linkModalOpen = true;
+
+    // focus the URL input after modal renders
+    setTimeout(() => document.getElementById('mmLinkUrl')?.focus(), 0);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  closeLinkModal(): void {
+    this.linkModalOpen = false;
+    this.linkError = null;
+    this.linkUrlDraft = '';
+    this.linkTextDraft = '';
+    this.savedLinkRange = null;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  confirmInsertLink(): void {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const url = (this.linkUrlDraft ?? '').trim();
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const text = (this.linkTextDraft ?? '').trim();
+
+    if (!text) {
+      this.linkError = 'Link text is required.';
+      return;
+    }
 
     if (!url.startsWith('https://')) {
-      alert('Only https:// links are allowed.');
+      this.linkError = 'URL must start with https://';
       return;
     }
 
-    // Replace selected text with <a>
-    this.insertHtmlAtCaret(`<a href="${url}" target="_blank" rel="noopener noreferrer">${selectedText}</a>`);
+    // Restore the saved selection and insert
+    const sel = window.getSelection();
+    if (sel && this.savedLinkRange) {
+      sel.removeAllRanges();
+      sel.addRange(this.savedLinkRange);
+    }
+
+    this.insertHtmlAtCaret(`<a href="${url}" target="_blank" rel="noopener noreferrer">${text}</a>`);
 
     // Sync editor → markdown → preview
     this.onEditorInput('body');
     setTimeout(() => this.renderTokens('body'));
+
+    this.closeLinkModal();
   }
 
   // -----------------------
@@ -1803,4 +2589,108 @@ export class MailDashboardComponent implements OnInit {
   get sentProjects(): Project[] {
     return this.filteredAllProjects.filter(p => (p as any).status === 'SENT');
   }
+
+  private showToast(type: 'warn' | 'error' | 'ok', text: string): void {
+    this.uiToast = { type, text };
+    setTimeout(() => (this.uiToast = null), 3000);
+  }
+
+  // -----------------------
+  // Validation error handling
+  // -----------------------
+  private showValidationError(message: string): void {
+    // Clear async error states so UI doesn't get stuck
+    this.testErr.set(false);
+    this.mergeErr.set(false);
+    this.testSending.set(false);
+    this.mergeSending.set(false);
+
+    // Show a clear, actionable message
+    this.showToast('error', message);
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  openDeleteProjectModal(p: Project, event?: MouseEvent): void {
+    event?.preventDefault();
+    event?.stopPropagation();
+
+    if (!p.id || this.deletingProject) return;
+
+    this.deleteTargetId = p.id;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    this.deleteTargetName = p.name ?? '';
+    this.deleteConfirmOpen = true;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  cancelDeleteProject(): void {
+    this.deleteConfirmOpen = false;
+    this.deleteTargetId = null;
+    this.deleteTargetName = '';
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  confirmDeleteProject(): void {
+    const deletingId = this.deleteTargetId;
+    if (!deletingId) return;
+
+    this.deleteConfirmOpen = false;
+    this.deletingProject = true;
+
+    // Hide in UI immediately
+    this.pendingDeletedProjectIds.add(deletingId);
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    this.projects = (this.projects ?? []).filter(p => p.id !== deletingId);
+
+    // If we deleted the currently open project, leave /mail/:id first
+    const wasOpen = this.projectId === deletingId;
+    if (wasOpen) {
+      this.clearEditorState();
+      void this.router.navigate(['/mail']);
+    }
+
+    this.projectService.delete(deletingId).subscribe({
+      next: () => {
+        this.pendingDeletedProjectIds.delete(deletingId);
+        this.deletingProject = false;
+        this.showToast('ok', 'Project deleted.');
+        this.deleteTargetId = null;
+        this.deleteTargetName = '';
+        this.loadProjects();
+      },
+      error: err => {
+        console.error('❌ Failed to delete project', err);
+        this.pendingDeletedProjectIds.delete(deletingId);
+        this.deletingProject = false;
+        this.showToast('error', 'Failed to delete project. Please try again.');
+        this.deleteTargetId = null;
+        this.deleteTargetName = '';
+        this.loadProjects();
+      },
+    });
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  drawerOpen = { ai: false, preview: false };
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleDrawer(which: 'ai' | 'preview'): void {
+    this.drawerOpen[which] = !this.drawerOpen[which];
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleBottomPanel(which: 'preview' | 'ai'): void {
+    if (which === 'preview') {
+      this.bottomPreviewOpen = !this.bottomPreviewOpen;
+      if (this.bottomPreviewOpen) {
+        this.previewMerge(); // keep it fresh when opening
+      }
+      return;
+    }
+
+    this.bottomAiOpen = !this.bottomAiOpen;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  trackByRowIndex = (i: number): number => i;
 }
