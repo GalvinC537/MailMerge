@@ -103,7 +103,20 @@ public class MailMergeService {
 
 
                 if (to == null || to.trim().isEmpty()) {
-                    log.warn("⚠️ Skipping row — missing 'to' address");
+                    sentCount++; // ✅ still count as "processed" so sentCount can reach totalCount
+
+                    log.warn("⚠️ Skipping row — missing 'to' address (sentCount={}/{})", sentCount, totalCount);
+
+                    progressService.sendProgress(
+                        new MailProgressEvent(
+                            "(skipped)",
+                            false,
+                            sentCount,
+                            totalCount,
+                            "Skipped row: missing 'To' after token/conditional replacement"
+                        )
+                    );
+
                     continue;
                 }
 

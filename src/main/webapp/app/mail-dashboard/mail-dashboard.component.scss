@@ -1511,7 +1511,7 @@
 
 .mm-bottom-split-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr; /* ✅ single column */
   gap: 10px;
   min-width: 0;
 }
@@ -1621,3 +1621,14 @@
 .mm-sheet-table td {
   white-space: nowrap; /* keeps columns readable; forces horizontal scroll */
 }
+
+.mm-draggable {
+  user-select: none;
+  cursor: grab;
+  padding: 8px 10px;
+  border: 1px solid rgba(0,0,0,0.1);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: #fff;
+}
+.mm-draggable:active { cursor: grabbing; }

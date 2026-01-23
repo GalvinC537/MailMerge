@@ -193,3 +193,58 @@
   cursor: pointer;
   color: var(--mm-text);
 }
+
+/* =========================
+   Buttons (reusable)
+   ========================= */
+
+.mm-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+
+  padding: 0.55rem 0.95rem;
+  border-radius: 10px;
+  border: 1px solid transparent;
+
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  user-select: none;
+
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, filter 0.15s ease;
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+
+  &:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+  }
+}
+
+/* Blue / primary */
+.mm-btn-primary {
+  background: var(--mm-primary);
+  border-color: var(--mm-primary);
+  color: #fff;
+
+  &:hover:not(:disabled) {
+    filter: brightness(0.95);
+  }
+}
+
+/* Grey / secondary */
+.mm-btn-secondary {
+  background: var(--mm-panel);
+  border-color: var(--mm-border);
+  color: var(--mm-muted);
+
+  &:hover:not(:disabled) {
+    background: var(--mm-bg);
+    color: var(--mm-text);
+  }
+}

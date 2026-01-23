@@ -366,7 +366,7 @@
                 (click)="testProject(); sendMenuOpen=false"
                 [disabled]="testSending() || mergeSending() || saving"
               >
-                Test
+                Test (send email to self)
               </button>
 
               <button
@@ -487,6 +487,27 @@
             <button type="button" class="mm-icon-btn" title="Bold" (mousedown)="formatFromToolbar($event, 'bold')"><b>B</b></button>
             <button type="button" class="mm-icon-btn" title="Italic" (mousedown)="formatFromToolbar($event, 'italic')"><i>I</i></button>
             <button type="button" class="mm-icon-btn" title="Underline" (mousedown)="formatFromToolbar($event, 'underline')"><u>U</u></button>
+            <div class="mm-merge-section">
+              <div class="mm-merge-section-title">Conditionals</div>
+
+              <div class="mm-draggable"
+                   draggable="true"
+                   (dragstart)="onConditionSnippetDragStart($event, 'if')">
+                [[if]] block
+              </div>
+
+              <div class="mm-draggable"
+                   draggable="true"
+                   (dragstart)="onConditionSnippetDragStart($event, 'nestedIf')">
+                Nested [[if]]
+              </div>
+
+              <div class="mm-draggable"
+                   draggable="true"
+                   (dragstart)="onConditionSnippetDragStart($event, 'thunderbird')">
+                Thunderbird one-liner
+              </div>
+            </div>
 
             <span class="mm-format-divider" aria-hidden="true"></span>
 
@@ -529,9 +550,66 @@
       </form>
 
       <!-- ✅ Bottom split: Preview (left) + AI (right) — spreadsheet-style boxes -->
+      <!-- ✅ Bottom stacked: AI (top) + Preview (bottom) — full-width bars -->
       <div class="mm-bottom-split" *ngIf="activePanel === 'compose'">
         <div class="mm-bottom-split-grid">
-          <!-- PREVIEW (left) -->
+          <!-- AI (top) -->
+          <div class="mm-collapsible">
+            <button
+              type="button"
+              class="mm-collapsible-header mm-bottom-panel-header"
+              (click)="toggleBottomPanel('ai')"
+              [attr.aria-expanded]="bottomAiOpen"
+            >
+        <span class="mm-bottom-panel-title">
+          <span class="mm-sheet-caret-btn" aria-hidden="true">
+            {{ bottomAiOpen ? '▾' : '▸' }}
+          </span>
+          <span>AI Improvement</span>
+        </span>
+            </button>
+
+            <div class="mm-collapsible-body" *ngIf="bottomAiOpen">
+              <h4 class="mb-3">Select Your Tone</h4>
+
+              <div class="d-flex gap-3 mb-3 flex-wrap mm-ai-actions">
+                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('professional')" [disabled]="isRewriting || !mergeBodyTemplate">
+                  ✨ Professional
+                </button>
+
+                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('friendly')" [disabled]="isRewriting || !mergeBodyTemplate">
+                  🙂 Friendly
+                </button>
+
+                <button
+                  class="mm-btn mm-btn-primary"
+                  (click)="rewriteEmailBody('custom')"
+                  [disabled]="isRewriting || !mergeBodyTemplate || !customTone"
+                >
+                  🎯 Custom
+                </button>
+              </div>
+
+              <input
+                type="text"
+                class="form-control mb-3"
+                [(ngModel)]="customTone"
+                name="customTone"
+                placeholder="e.g. more concise, persuasive, motivational..."
+                style="max-width: 420px;"
+              />
+
+              <div *ngIf="aiRewrittenText && !isRewriting" class="mm-ai-preview">
+                <h5>Suggested Rewrite</h5>
+                <div class="mm-ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
+                <button class="mm-btn mm-btn-primary mt-2" (click)="applyRewrittenEmail()">✅ Use This Email</button>
+              </div>
+
+              <div *ngIf="isRewriting" class="mm-muted">Rewriting…</div>
+            </div>
+          </div>
+
+          <!-- PREVIEW (bottom) -->
           <div class="mm-collapsible">
             <button
               type="button"
@@ -575,69 +653,12 @@
               </div>
 
               <ng-template #noPreviewTpl>
-                <div class="mm-muted">No preview available yet. Connect a spreadsheet first.</div>
+                <div class="mm-muted">No preview available yet. Start writing your mailmerge!</div>
               </ng-template>
-            </div>
-          </div>
-
-          <!-- AI (right) -->
-          <div class="mm-collapsible">
-            <button
-              type="button"
-              class="mm-collapsible-header mm-bottom-panel-header"
-              (click)="toggleBottomPanel('ai')"
-              [attr.aria-expanded]="bottomAiOpen"
-            >
-        <span class="mm-bottom-panel-title">
-          <span class="mm-sheet-caret-btn" aria-hidden="true">
-            {{ bottomAiOpen ? '▾' : '▸' }}
-          </span>
-          <span>AI</span>
-        </span>
-            </button>
-
-            <div class="mm-collapsible-body" *ngIf="bottomAiOpen">
-              <h4 class="mb-3">Select Your Tone</h4>
-
-              <div class="d-flex gap-3 mb-3 flex-wrap mm-ai-actions">
-                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('professional')" [disabled]="isRewriting || !mergeBodyTemplate">
-                  ✨ Professional
-                </button>
-
-                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('friendly')" [disabled]="isRewriting || !mergeBodyTemplate">
-                  🙂 Friendly
-                </button>
-
-                <button
-                  class="mm-btn mm-btn-primary"
-                  (click)="rewriteEmailBody('custom')"
-                  [disabled]="isRewriting || !mergeBodyTemplate || !customTone"
-                >
-                  🎯 Custom
-                </button>
-              </div>
-
-              <input
-                type="text"
-                class="form-control mb-3"
-                [(ngModel)]="customTone"
-                name="customTone"
-                placeholder="e.g. more concise, persuasive, motivational..."
-                style="max-width: 420px;"
-              />
-
-              <div *ngIf="aiRewrittenText && !isRewriting" class="mm-ai-preview">
-                <h5>Suggested Rewrite</h5>
-                <div class="mm-ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
-                <button class="mm-btn mm-btn-primary mt-2" (click)="applyRewrittenEmail()">✅ Use This Email</button>
-              </div>
-
-              <div *ngIf="isRewriting" class="mm-muted">Rewriting…</div>
             </div>
           </div>
         </div>
       </div>
-
       <!-- ✅ Right-side panels (only one at a time) -->
       <section class="mm-panels" *ngIf="activePanel !== 'compose'">
         <!-- HOW TO -->
