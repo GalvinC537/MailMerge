@@ -77,7 +77,7 @@
               <li>
                 <button type="button" class="dropdown-item" (click)="openSignatureModal()">
                   <fa-icon icon="signature" [fixedWidth]="true"></fa-icon>
-                  <span>Signature</span>
+                  <span>Update Signature</span>
                 </button>
               </li>
             }
@@ -131,7 +131,7 @@
     </div>
 
     <div class="mm-modal-footer">
-      <button type="button" class="mm-btn" (click)="closeSignatureModal()">Cancel</button>
+      <button type="button" class="mm-btn mm-btn-secondary" (click)="closeSignatureModal()">Cancel</button>
       <button type="button" class="mm-btn mm-btn-primary" (click)="saveSignatureFromModal()" [disabled]="signatureSaving">
         {{ signatureSaving ? 'Saving…' : 'Save' }}
       </button>

@@ -317,19 +317,38 @@ export class MailDashboardComponent implements OnInit {
   }
 
   confirmCreateProject(): void {
-    const name = this.newProjectName.trim();
+    const name = (this.newProjectName || '').trim();
     if (!name) return;
 
-    this.creatingProject = false;
+    // If this flag means "modal open", you can keep using it.
+    // If you ever want a separate "loading" spinner, create a second boolean later.
+    this.creatingProject = true;
 
-    const project: Project = { name };
-    this.projectService.create(project).subscribe({
-      next: created => {
-        this.projects = [created, ...this.projects];
-        this.activePanel = 'compose';
-        void this.router.navigate(['/mail', created.id]);
+    const newProject: any = {
+      name,
+      status: 'PENDING', // ✅ goes into Drafts immediately
+    };
+
+    this.projectService.create(newProject).subscribe({
+      next: (created: Project) => {
+        // ✅ created is already the Project (no .body)
+        this.creatingProject = false;
+        this.newProjectName = '';
+
+        this.saveSuccess = true;
+        setTimeout(() => (this.saveSuccess = false), 2000);
+
+        this.loadProjects();
+
+        if (created.id) {
+          this.openProjectFromSidebar(created);
+        }
       },
-      error: err => console.error('❌ Failed to create project', err),
+      error: err => {
+        console.error('❌ Create project failed', err);
+        this.creatingProject = false;
+        this.showToast('error', 'Failed to create project. Please try again.');
+      },
     });
   }
 
@@ -855,8 +874,10 @@ export class MailDashboardComponent implements OnInit {
 
   private validateEmailFieldForAllRows(field: 'to' | 'cc' | 'bcc', required: boolean): { ok: true } | { ok: false; message: string } {
     const template = field === 'to' ? this.toField : field === 'cc' ? this.ccField : this.bccField;
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const tpl = (template ?? '').trim();
 
-    if (!template.trim()) {
+    if (!tpl) {
       return required ? { ok: false, message: 'The “To” field is required.' } : { ok: true };
     }
 
@@ -865,24 +886,38 @@ export class MailDashboardComponent implements OnInit {
       return { ok: true };
     }
 
+    const hasConditionals = this.templateHasConditionals(tpl);
+
     for (let i = 0; i < this.spreadsheetRows.length; i++) {
       const row = this.spreadsheetRows[i];
-      const resolved = this.replaceTokens(template, row).trim();
+      const resolved = this.renderTemplateForRow(tpl, row).trim();
 
       if (!resolved) {
+        // ✅ KEY CHANGE: if To resolves empty due to conditionals, we SKIP that row
+        if (required && hasConditionals) {
+          continue;
+        }
+
         if (required) {
           return {
             ok: false,
-            message: `Row ${i + 1}: “To” resolves to empty. Use a valid email column.`,
+            message: `Row ${i + 1}: “To” resolves to empty. Use a valid email column or a conditional that produces an email.`,
           };
         }
         continue;
       }
 
+      // support comma OR semicolon separated recipients
       const emails = resolved
-        .split(',')
+        .split(/[;,]/)
         .map(e => e.trim())
         .filter(Boolean);
+
+      if (required && emails.length === 0) {
+        // edge case: only separators/spaces
+        if (hasConditionals) continue;
+        return { ok: false, message: `Row ${i + 1}: “To” resolves to empty.` };
+      }
 
       for (const email of emails) {
         if (!this.isValidEmail(email)) {
@@ -1022,8 +1057,9 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   testProject(): void {
-    this.testErr.set(false); // in testProject()
-    this.mergeErr.set(false); // in sendProject()
+    this.testErr.set(false);
+    this.mergeErr.set(false);
+
     if (!this.projectId || !this.mergeFile) {
       this.testErr.set(true);
       this.showToast('warn', 'Connect a spreadsheet before sending a test email.');
@@ -1035,35 +1071,17 @@ export class MailDashboardComponent implements OnInit {
       return;
     }
 
-    // ✅ NEW: validate To (including token resolution)
-    // ✅ NEW: validate To (including token resolution)
     if (!this.guardBeforeSendOrTest()) {
-      return; // ⬅ stop cleanly, no stuck UI
+      return;
     }
 
     this.testSending.set(true);
     this.testErr.set(false);
     this.testSuccess = false;
 
-    const { htmlWithCid, inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
-
     this.saveProjectAndReturnObservable().subscribe({
       next: () => {
-        const payload = {
-          subjectTemplate: this.mergeSubjectTemplate,
-          bodyTemplate: htmlWithCid,
-          inlineImages,
-          toTemplate: this.toField,
-          ccTemplate: this.ccField,
-          bccTemplate: this.bccField,
-          spreadsheet: this.spreadsheetBase64,
-          spreadsheetFileContentType: this.spreadsheetFileContentType,
-          attachments: this.attachments.map(a => ({
-            name: a.name,
-            fileContentType: a.fileContentType,
-            file: a.base64,
-          })),
-        };
+        const payload = this.buildAdvancedPayloadRespectingConditionals();
 
         this.projectService.sendMailMergeTestWithMeta(payload).subscribe({
           next: () => {
@@ -1091,8 +1109,9 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   sendProject(): void {
-    this.testErr.set(false); // in testProject()
-    this.mergeErr.set(false); // in sendProject()
+    this.testErr.set(false);
+    this.mergeErr.set(false);
+
     if (!this.projectId || !this.mergeFile) {
       this.mergeErr.set(true);
       this.showToast('warn', 'Connect a spreadsheet before sending.');
@@ -1104,10 +1123,8 @@ export class MailDashboardComponent implements OnInit {
       return;
     }
 
-    // ✅ NEW: validate To (including token resolution)
-    // ✅ NEW: validate To (including token resolution)
     if (!this.guardBeforeSendOrTest()) {
-      return; // ⬅ clean exit
+      return;
     }
 
     this.mergeSending.set(true);
@@ -1119,25 +1136,9 @@ export class MailDashboardComponent implements OnInit {
     this.progressLogs = [];
     this.sendingFinished = false;
 
-    const { htmlWithCid, inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
-
     this.saveProjectAndReturnObservable().subscribe({
       next: () => {
-        const payload = {
-          subjectTemplate: this.mergeSubjectTemplate,
-          bodyTemplate: htmlWithCid,
-          inlineImages,
-          toTemplate: this.toField,
-          ccTemplate: this.ccField,
-          bccTemplate: this.bccField,
-          spreadsheet: this.spreadsheetBase64,
-          spreadsheetFileContentType: this.spreadsheetFileContentType,
-          attachments: this.attachments.map(a => ({
-            name: a.name,
-            fileContentType: a.fileContentType,
-            file: a.base64,
-          })),
-        };
+        const payload = this.buildAdvancedPayloadRespectingConditionals();
 
         this.projectService.sendMailMergeWithMeta(payload).subscribe({
           next: () => {
@@ -1192,6 +1193,10 @@ export class MailDashboardComponent implements OnInit {
   // -----------------------
   // Preview
   // -----------------------
+
+  // -----------------------
+  // Preview
+  // -----------------------
   // eslint-disable-next-line @typescript-eslint/member-ordering
   previewMerge(): void {
     // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
@@ -1202,36 +1207,47 @@ export class MailDashboardComponent implements OnInit {
 
     const rows = this.spreadsheetRows;
 
-    const replaceTokens = (template: string, row: Record<string, string>): string => {
-      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-      let out = template ?? '';
-      Object.entries(row).forEach(([key, value]) => {
-        const safeKey = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        const regex = new RegExp(`{{\\s*${safeKey}\\s*}}`, 'g');
-        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-        out = out.replace(regex, String(value ?? ''));
-      });
-      return out;
-    };
+    this.previewEmails = rows
+      .map(row => {
+        const subjectFinal = this.renderTemplateForRow(this.mergeSubjectTemplate, row);
 
-    this.previewEmails = rows.map(row => {
-      const subjectAfterTokens = replaceTokens(this.mergeSubjectTemplate, row);
-      const toAfterTokens = replaceTokens(this.toField, row);
-      const ccAfterTokens = replaceTokens(this.ccField, row);
-      const bccAfterTokens = replaceTokens(this.bccField, row);
+        const toRaw = this.renderTemplateForRow(this.toField, row);
+        const toFinal = this.normalizeRecipientList(toRaw);
 
-      const bodyTokenReplaced = replaceTokens(this.mergeBodyTemplate, row);
-      const bodyHtml = this.convertMarkdownToHtml(bodyTokenReplaced);
+        // ✅ Hide rows that would be skipped server-side
+        if (!toFinal) return null;
 
-      return {
-        to: toAfterTokens || '(missing To)',
-        cc: ccAfterTokens,
-        bcc: bccAfterTokens,
-        subject: subjectAfterTokens,
-        body: this.sanitizer.bypassSecurityTrustHtml(bodyHtml),
-        attachments: this.attachments,
-      };
-    });
+        const ccFinal = this.normalizeRecipientList(this.renderTemplateForRow(this.ccField, row));
+        const bccFinal = this.normalizeRecipientList(this.renderTemplateForRow(this.bccField, row));
+
+        const bodyFinalMd = this.renderTemplateForRow(this.mergeBodyTemplate, row);
+        const bodyHtml = this.convertMarkdownToHtml(bodyFinalMd);
+
+        return {
+          to: toFinal,
+          cc: ccFinal,
+          bcc: bccFinal,
+          subject: subjectFinal,
+          body: this.sanitizer.bypassSecurityTrustHtml(bodyHtml),
+          attachments: this.attachments,
+        };
+      })
+      .filter((x): x is NonNullable<typeof x> => x !== null);
+  }
+
+  private normalizeRecipientList(raw: string): string {
+    const s = (raw || '').trim();
+    if (!s) return '';
+
+    // If conditionals produce whitespace/newlines, this collapses them.
+    // Then we split into recipients and re-join cleanly.
+    const parts = s
+      .replace(/\s+/g, ' ')
+      .split(/[;,]/)
+      .map(x => x.trim())
+      .filter(Boolean);
+
+    return parts.join(', ');
   }
 
   // -----------------------
@@ -1451,25 +1467,46 @@ export class MailDashboardComponent implements OnInit {
     const el = document.getElementById(this.getElementId(field));
     if (!el) return;
 
-    // ✅ NEW: convert a freshly typed {{token}} into a chip *in-place* (no full rerender)
-    // This avoids caret jumping / "weird" behaviour.
     this.tryConvertTypedTokenAtCaret(field, el);
 
     let html = el.innerHTML;
 
-    // Keep your existing span->{{}} normalization
+    // keep your existing span->{{}} normalization
     html = html.replace(/<span[^>]*class="merge-token"[^>]*data-field="([^"]+)"[^>]*>.*?<\/span>/gi, '{{$1}}');
 
-    const markdown = this.htmlToMarkdown(html);
+    // ✅ IMPORTANT: To/Cc/Bcc/Subject should be plain text (no HTML tags)
+    if (field !== 'body') {
+      const text = this.htmlToPlainText(html);
 
-    if (field === 'body') this.mergeBodyTemplate = markdown;
-    else if (field === 'subject') this.mergeSubjectTemplate = markdown;
-    else if (field === 'to') this.toField = markdown;
-    else if (field === 'cc') this.ccField = markdown;
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
-    else if (field === 'bcc') this.bccField = markdown;
+      if (field === 'subject') this.mergeSubjectTemplate = text;
+      else if (field === 'to') this.toField = text;
+      else if (field === 'cc') this.ccField = text;
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      else if (field === 'bcc') this.bccField = text;
+
+      this.previewMerge();
+      return;
+    }
+
+    // ✅ Body keeps markdown conversion
+    const markdown = this.htmlToMarkdown(html);
+    this.mergeBodyTemplate = markdown;
 
     this.previewMerge();
+  }
+
+  private htmlToPlainText(html: string): string {
+    const tmp = document.createElement('div');
+    tmp.innerHTML = html || '';
+
+    // innerText strips tags like <div>, <br>, etc.
+    let text = tmp.innerText || '';
+
+    // normalize NBSP and line endings
+    text = text.replace(/\u00A0/g, ' ').replace(/\r\n/g, '\n');
+
+    // trim but keep internal newlines (useful for [[if]] blocks)
+    return text.trim();
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -2693,4 +2730,542 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   trackByRowIndex = (i: number): number => i;
+
+  // -----------------------
+  // Conditionals [[if]] [[else]] [[endif]]
+  // -----------------------
+
+  private templateHasConditionals(s: string): boolean {
+    const t = s || '';
+    // block syntax
+    if (t.includes('[[if') || t.includes('[[else]]') || t.includes('[[endif]]')) return true;
+
+    // thunderbird-like inline syntax: {{ ...|...|... }}
+    return /{{[^}]*\|[^}]*}}/.test(t);
+  }
+
+  /** Apply conditionals first (block + thunderbird), then {{token}} replacement */
+  private renderTemplateForRow(template: string, row: Record<string, string>): string {
+    const withBlocks = this.applyConditionals(template || '', row);
+    const withThunderbird = this.applyThunderbirdInlineConditionals(withBlocks, row);
+    return this.replaceTokens(withThunderbird, row);
+  }
+
+  /**
+   * Supports:
+   * [[if <expr>]] ... [[else]] ... [[endif]]
+   * - Nested blocks supported
+   * - If condition is false and no else -> block becomes empty
+   */
+  private applyConditionals(template: string, row: Record<string, string>): string {
+    const src = template || '';
+    if (!this.templateHasConditionals(src)) return src;
+
+    type Frame = { parentActive: boolean; condTrue: boolean; inElse: boolean };
+
+    const stack: Frame[] = [];
+    let out = '';
+    let i = 0;
+
+    const isCurrentlyActive = (): boolean => {
+      // active if all frames evaluate to active for this branch
+      for (const f of stack) {
+        const branchActive = f.inElse ? !f.condTrue : f.condTrue;
+        if (!(f.parentActive && branchActive)) return false;
+      }
+      return true;
+    };
+
+    const readUntil = (needle: string): string => {
+      const start = i;
+      const idx = src.indexOf(needle, i);
+      if (idx === -1) {
+        i = src.length;
+        return src.slice(start);
+      }
+      i = idx + needle.length;
+      return src.slice(start, idx);
+    };
+
+    while (i < src.length) {
+      const next = src.indexOf('[[', i);
+      if (next === -1) {
+        if (isCurrentlyActive()) out += src.slice(i);
+        break;
+      }
+
+      // emit plain text before tag
+      if (next > i && isCurrentlyActive()) {
+        out += src.slice(i, next);
+      }
+      i = next;
+
+      // handle tags
+      if (src.startsWith('[[if', i)) {
+        // parse: [[if ...]]
+        const close = src.indexOf(']]', i);
+        if (close === -1) {
+          // malformed -> treat as text
+          if (isCurrentlyActive()) out += src.slice(i);
+          break;
+        }
+
+        const inner = src.slice(i + '[[if'.length, close).trim(); // expr
+        i = close + 2;
+
+        const parentActive = isCurrentlyActive();
+        const condTrue = parentActive ? this.evalCondition(inner, row) : false;
+
+        stack.push({ parentActive, condTrue, inElse: false });
+        continue;
+      }
+
+      if (src.startsWith('[[else]]', i)) {
+        i += '[[else]]'.length;
+        const top = stack[stack.length - 1];
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        if (top) top.inElse = true;
+        continue;
+      }
+
+      if (src.startsWith('[[endif]]', i)) {
+        i += '[[endif]]'.length;
+        stack.pop();
+        continue;
+      }
+
+      // unknown [[...]] -> treat as literal
+      if (isCurrentlyActive()) out += '[[';
+      i += 2;
+    }
+
+    return out;
+  }
+
+  /**
+   * Expr formats supported:
+   * - token OP literal:   score >= 70
+   * - token OP token:     grade == result
+   * - token truthy:       paid
+   * Operators: == != > >= < <=
+   * Literals: numbers, "strings", 'strings', true/false
+   */
+  private decodeHtmlEntities(s: string): string {
+    // Covers the ones you care about for comparisons
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    return (s ?? '')
+      .replace(/&gt;/g, '>')
+      .replace(/&lt;/g, '<')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'");
+  }
+
+  private evalCondition(expr: string, row: Record<string, string>): boolean {
+    // ✅ decode things like &gt;= back to >=
+    const e = this.decodeHtmlEntities((expr || '').trim());
+    if (!e) return false;
+
+    const m = e.match(/^(.+?)\s*(==|!=|>=|<=|>|<)\s*(.+)$/);
+    if (!m) {
+      const v = this.resolveOperand(e, row);
+      return this.isTruthy(v);
+    }
+
+    const leftRaw = m[1].trim();
+    const op = m[2].trim();
+    const rightRaw = m[3].trim();
+
+    const left = this.resolveOperand(leftRaw, row);
+    const right = this.resolveOperand(rightRaw, row);
+
+    const leftNum = this.tryNumber(left);
+    const rightNum = this.tryNumber(right);
+
+    const bothNumeric = leftNum != null && rightNum != null;
+
+    if (bothNumeric) {
+      if (op === '==') return leftNum === rightNum;
+      if (op === '!=') return leftNum !== rightNum;
+      if (op === '>') return leftNum > rightNum;
+      if (op === '>=') return leftNum >= rightNum;
+      if (op === '<') return leftNum < rightNum;
+      if (op === '<=') return leftNum <= rightNum;
+      return false;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const ls = String(left ?? '');
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const rs = String(right ?? '');
+
+    if (op === '==') return ls === rs;
+    if (op === '!=') return ls !== rs;
+    if (op === '>') return ls > rs;
+    if (op === '>=') return ls >= rs;
+    if (op === '<') return ls < rs;
+    if (op === '<=') return ls <= rs;
+
+    return false;
+  }
+
+  // Require {{token}} for column references inside [[if ...]]
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private readonly REQUIRE_TOKENS_IN_CONDITIONS = true;
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  onConditionSnippetDragStart(event: DragEvent, snippet: 'if' | 'nestedIf' | 'thunderbird'): void {
+    if (!this.hasSelectedProject) return;
+
+    const text =
+      snippet === 'if'
+        ? '[[if {{COLUMN}} == "VALUE"]]\nYOUR_TEXT\n[[else]]\nELSE_TEXT\n[[endif]]'
+        : snippet === 'nestedIf'
+          ? '[[if {{A}} == "X"]]\nTEXT_A\n[[else]]\n  [[if {{B}} == "Y"]]\n  TEXT_B\n  [[else]]\n  TEXT_C\n  [[endif]]\n[[endif]]'
+          : '{{COLUMN|==|"VALUE"|THEN_TEXT|ELSE_TEXT}}';
+
+    event.dataTransfer?.setData('text/plain', text);
+  }
+
+  private resolveOperand(raw: string, row: Record<string, string>): string {
+    const r = (raw || '').trim();
+
+    // quoted string
+    const dq = r.match(/^"(.*)"$/);
+    if (dq) return dq[1];
+
+    const sq = r.match(/^'(.*)'$/);
+    if (sq) return sq[1];
+
+    // boolean literal
+    if (/^(true|false)$/i.test(r)) return r.toLowerCase();
+
+    // number literal
+    if (/^-?\d+(\.\d+)?$/.test(r)) return r;
+
+    // ✅ token reference: {{ someColumn }}
+    const token = r.match(/^{{\s*([^}]+)\s*}}$/);
+    if (token) {
+      const key = (token[1] || '').trim();
+      return String((row as any)[key] ?? '').trim();
+    }
+
+    // ✅ Enforce token-only (so bare column names don't work)
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    if (this.REQUIRE_TOKENS_IN_CONDITIONS) {
+      return '';
+    }
+
+    // Backwards compatible mode (if you ever switch REQUIRE_TOKENS_IN_CONDITIONS off)
+    return String((row as any)[r] ?? '').trim();
+  }
+
+  private tryNumber(v: string): number | null {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const s = String(v ?? '').trim();
+    if (!s) return null;
+
+    // grabs the first numeric substring (handles "80%", "Grade: 80", etc.)
+    const m = s.match(/-?\d+(\.\d+)?/);
+    if (!m) return null;
+
+    const n = Number(m[0]);
+    return Number.isFinite(n) ? n : null;
+  }
+
+  private isTruthy(v: string): boolean {
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const s = String(v ?? '')
+      .trim()
+      .toLowerCase();
+    if (!s) return false;
+    if (s === 'false') return false;
+    if (s === '0') return false;
+    return true;
+  }
+
+  private applyInlineCidsToHtml(html: string, inlineImages: InlineImage[]): string {
+    const map = new Map<string, string>();
+    inlineImages.forEach(img => {
+      const key = `${img.fileContentType}|${img.base64}`;
+      map.set(key, img.cid);
+    });
+
+    const doc = new DOMParser().parseFromString(html || '', 'text/html');
+    const imgs = Array.from(doc.querySelectorAll('img'));
+
+    imgs.forEach(img => {
+      const src = img.getAttribute('src') ?? '';
+      if (!src.startsWith('data:image/')) return;
+
+      const match = src.match(/^data:(image\/[a-zA-Z0-9.+-]+);base64,(.+)$/);
+      if (!match) return;
+
+      const fileContentType = match[1];
+      const base64 = match[2];
+      const cid = map.get(`${fileContentType}|${base64}`);
+      if (!cid) return;
+
+      img.setAttribute('src', `cid:${cid}`);
+    });
+
+    return doc.body.innerHTML;
+  }
+
+  private buildAdvancedPayloadRespectingConditionals(): {
+    subjectTemplate: string;
+    bodyTemplate: string;
+    inlineImages: InlineImage[];
+    toTemplate: string;
+    ccTemplate: string;
+    bccTemplate: string;
+    spreadsheet: string | null;
+    spreadsheetFileContentType: string | null;
+    attachments: { name: string; fileContentType: string; file: string }[];
+  } {
+    const hasConds =
+      this.templateHasConditionals(this.mergeSubjectTemplate) ||
+      this.templateHasConditionals(this.mergeBodyTemplate) ||
+      this.templateHasConditionals(this.toField) ||
+      this.templateHasConditionals(this.ccField) ||
+      this.templateHasConditionals(this.bccField);
+
+    // No conditionals? Keep your existing behaviour unchanged
+    if (!hasConds) {
+      const { htmlWithCid, inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
+      return {
+        subjectTemplate: this.mergeSubjectTemplate,
+        bodyTemplate: htmlWithCid,
+        inlineImages,
+        toTemplate: this.toField,
+        ccTemplate: this.ccField,
+        bccTemplate: this.bccField,
+        spreadsheet: this.spreadsheetBase64,
+        spreadsheetFileContentType: this.spreadsheetFileContentType,
+        attachments: this.attachments.map(a => ({ name: a.name, fileContentType: a.fileContentType, file: a.base64 })),
+      };
+    }
+
+    // Conditionals present -> precompute per-row final fields into extra spreadsheet columns
+    const { inlineImages } = this.buildEmailHtmlForSending(this.mergeBodyTemplate);
+
+    const baseHeaders = this.spreadsheetHeaders.slice();
+    const extraHeaders = ['__to', '__cc', '__bcc', '__subject', '__body'];
+    const headers = [...baseHeaders, ...extraHeaders];
+
+    const aoa: (string | number | boolean | null)[][] = [headers];
+
+    for (const row of this.spreadsheetRows) {
+      const baseVals = baseHeaders.map(h => String((row as any)[h] ?? ''));
+
+      const finalTo = this.renderTemplateForRow(this.toField, row);
+      const finalCc = this.renderTemplateForRow(this.ccField, row);
+      const finalBcc = this.renderTemplateForRow(this.bccField, row);
+      const finalSubject = this.renderTemplateForRow(this.mergeSubjectTemplate, row);
+
+      const finalBodyMd = this.renderTemplateForRow(this.mergeBodyTemplate, row);
+      const finalBodyHtml = this.convertMarkdownToHtml(finalBodyMd);
+      const finalBodyHtmlWithCid = this.applyInlineCidsToHtml(finalBodyHtml, inlineImages);
+
+      aoa.push([...baseVals, finalTo, finalCc, finalBcc, finalSubject, finalBodyHtmlWithCid]);
+    }
+
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(aoa);
+    XLSX.utils.book_append_sheet(wb, ws, 'Sheet1');
+
+    const base64Xlsx = XLSX.write(wb, { bookType: 'xlsx', type: 'base64' });
+
+    return {
+      // backend will replace these single tokens per row
+      subjectTemplate: '{{__subject}}',
+      bodyTemplate: '{{__body}}',
+      inlineImages,
+      toTemplate: '{{__to}}',
+      ccTemplate: '{{__cc}}',
+      bccTemplate: '{{__bcc}}',
+      spreadsheet: base64Xlsx,
+      spreadsheetFileContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      attachments: this.attachments.map(a => ({ name: a.name, fileContentType: a.fileContentType, file: a.base64 })),
+    };
+  }
+
+  /**
+   * Thunderbird-style inline conditionals:
+   * {{Field|op|value|then|else}}
+   *
+   * - value can be quoted "text" or 'text'
+   * - then/else can contain {{tokens}} (they’ll be replaced later)
+   * - else is optional -> becomes empty string
+   *
+   * Ops: == != > >= < <= contains startsWith endsWith empty notEmpty truthy falsy
+   */
+  private applyThunderbirdInlineConditionals(template: string, row: Record<string, string>): string {
+    let src = template || '';
+    if (!/{{[^}]*\|[^}]*}}/.test(src)) return src;
+
+    // prevent infinite loops if user nests these heavily
+    const MAX_PASSES = 6;
+
+    for (let pass = 0; pass < MAX_PASSES; pass++) {
+      let changed = false;
+
+      src = src.replace(/{{\s*([^{}]*\|[^{}]*)\s*}}/g, (full, innerRaw: string) => {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const parts = this.splitPipesRespectingQuotes(String(innerRaw ?? '').trim());
+        if (parts.length < 2) return full;
+
+        // basic form: field|op|value|then|else
+        const field = (parts[0] ?? '').trim();
+        const op = ((parts[1] ?? '') + '').trim();
+
+        const rawValue = (parts[2] ?? '').trim();
+        const thenPart = parts.length >= 4 ? (parts[3] ?? '') : '';
+        const elsePart = parts.length >= 5 ? (parts[4] ?? '') : '';
+
+        // resolve LHS from spreadsheet row
+        const left = String((row as any)[field] ?? '').trim();
+
+        // resolve RHS depending on op
+        const right = this.resolveThunderbirdValue(rawValue, row);
+
+        const ok = this.evalThunderbirdOp(left, op, right);
+
+        changed = true;
+        return ok ? thenPart : elsePart;
+      });
+
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      if (!changed) break;
+    }
+
+    return src;
+  }
+
+  private splitPipesRespectingQuotes(s: string): string[] {
+    const out: string[] = [];
+    let cur = '';
+    let q: '"' | "'" | null = null;
+    let esc = false;
+
+    // eslint-disable-next-line @typescript-eslint/prefer-for-of
+    for (let i = 0; i < s.length; i++) {
+      const ch = s[i];
+
+      if (esc) {
+        cur += ch;
+        esc = false;
+        continue;
+      }
+
+      if (ch === '\\') {
+        esc = true;
+        continue;
+      }
+
+      if ((ch === '"' || ch === "'") && !q) {
+        q = ch as any;
+        cur += ch;
+        continue;
+      }
+
+      if (q && ch === q) {
+        q = null;
+        cur += ch;
+        continue;
+      }
+
+      if (!q && ch === '|') {
+        out.push(cur);
+        cur = '';
+        continue;
+      }
+
+      cur += ch;
+    }
+
+    out.push(cur);
+    return out.map(p => p.replace(/\\\|/g, '|').trim());
+  }
+
+  private resolveThunderbirdValue(raw: string, row: Record<string, string>): string {
+    const r = (raw || '').trim();
+
+    // allow empty
+    if (!r) return '';
+
+    // quoted string
+    const dq = r.match(/^"(.*)"$/);
+    if (dq) return dq[1];
+
+    const sq = r.match(/^'(.*)'$/);
+    if (sq) return sq[1];
+
+    // allow referencing another column with {{Column}}
+    const token = r.match(/^{{\s*([^}]+)\s*}}$/);
+    if (token) {
+      const key = (token[1] || '').trim();
+      return String((row as any)[key] ?? '').trim();
+    }
+
+    // boolean literal
+    if (/^(true|false)$/i.test(r)) return r.toLowerCase();
+
+    // number literal
+    if (/^-?\d+(\.\d+)?$/.test(r)) return r;
+
+    // otherwise treat as literal text
+    return r;
+  }
+
+  private evalThunderbirdOp(leftRaw: string, opRaw: string, rightRaw: string): boolean {
+    const op = (opRaw || '').trim();
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const left = String(leftRaw ?? '').trim();
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+    const right = String(rightRaw ?? '').trim();
+
+    const ln = this.tryNumber(left);
+    const rn = this.tryNumber(right);
+    const bothNumeric = ln != null && rn != null;
+
+    const lc = left.toLowerCase();
+    const rc = right.toLowerCase();
+
+    switch (op) {
+      case '==':
+        return bothNumeric ? ln === rn : left === right;
+      case '!=':
+        return bothNumeric ? ln !== rn : left !== right;
+      case '>':
+        return bothNumeric ? ln > rn : left > right;
+      case '>=':
+        return bothNumeric ? ln >= rn : left >= right;
+      case '<':
+        return bothNumeric ? ln < rn : left < right;
+      case '<=':
+        return bothNumeric ? ln <= rn : left <= right;
+
+      case 'contains':
+        return lc.includes(rc);
+      case 'startsWith':
+        return lc.startsWith(rc);
+      case 'endsWith':
+        return lc.endsWith(rc);
+
+      case 'empty':
+        return !left.trim();
+      case 'notEmpty':
+        return !!left.trim();
+
+      case 'truthy':
+        return this.isTruthy(left);
+      case 'falsy':
+        return !this.isTruthy(left);
+
+      default:
+        // unknown operator -> treat as false so it doesn't accidentally include content
+        return false;
+    }
+  }
 }
