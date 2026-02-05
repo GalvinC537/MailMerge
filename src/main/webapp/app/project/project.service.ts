@@ -14,6 +14,7 @@ export interface Project {
 
   // ✅ NEW: original spreadsheet filename (e.g. "scores.xlsx")
   spreadsheetName?: string | null;
+
   header?: string;
   content?: string;
   status?: 'PENDING' | 'SENT' | 'FAILED';
@@ -28,7 +29,6 @@ export interface Project {
 @Injectable({ providedIn: 'root' })
 export class ProjectService {
   private resourceUrl = '/api/projects';
-
   constructor(private http: HttpClient) {}
 
   // This are all the CRUD methods used by the mail-dashboard and projects page

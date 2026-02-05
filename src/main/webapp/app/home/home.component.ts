@@ -12,7 +12,9 @@ import { Account } from 'app/core/auth/account.model';
 })
 export default class HomeComponent implements OnInit {
   private readonly accountService = inject(AccountService);
+
   private readonly loginService = inject(LoginService);
+
   private readonly router = inject(Router);
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -21,6 +23,7 @@ export default class HomeComponent implements OnInit {
   ngOnInit(): void {
     this.accountService.identity().subscribe(account => {
       this.account.set(account);
+
       // If user is already logged in, go straight to the dashboard
       if (account) {
         this.router.navigate(['/mail-dashboard']);

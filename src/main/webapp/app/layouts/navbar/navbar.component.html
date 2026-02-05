@@ -1,3 +1,4 @@
+<!-- navbar.component.html -->
 <nav data-cy="navbar" class="navbar navbar-expand-md bg-white shadow-sm">
   <div class="container-fluid">
     <!-- Logo and Title -->
@@ -110,7 +111,13 @@
      Signature Modal (Navbar)
      ========================= -->
 <div class="mm-modal-backdrop" *ngIf="signatureModalOpen" (click)="closeSignatureModal()">
-  <div class="mm-modal" role="dialog" aria-modal="true" aria-labelledby="mmSignatureTitle" (click)="$event.stopPropagation()">
+  <div
+    class="mm-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="mmSignatureTitle"
+    (click)="$event.stopPropagation()"
+  >
     <div class="mm-modal-header">
       <div id="mmSignatureTitle" class="mm-modal-title">Signature</div>
       <button type="button" class="mm-icon-btn" title="Close" (click)="closeSignatureModal()">✕</button>
@@ -132,7 +139,12 @@
 
     <div class="mm-modal-footer">
       <button type="button" class="mm-btn mm-btn-secondary" (click)="closeSignatureModal()">Cancel</button>
-      <button type="button" class="mm-btn mm-btn-primary" (click)="saveSignatureFromModal()" [disabled]="signatureSaving">
+      <button
+        type="button"
+        class="mm-btn mm-btn-primary"
+        (click)="saveSignatureFromModal()"
+        [disabled]="signatureSaving"
+      >
         {{ signatureSaving ? 'Saving…' : 'Save' }}
       </button>
     </div>

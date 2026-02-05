@@ -60,6 +60,12 @@ const routes: Routes = [
   },
 
   {
+    path: 'privacy-policy',
+    loadComponent: () => import('./privacy-policy/privacy-policy.component'),
+    title: 'Privacy Policy',
+  },
+
+  {
     path: '',
     loadChildren: () => import('./entities/entity.routes'),
   },

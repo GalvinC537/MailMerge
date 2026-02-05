@@ -13,21 +13,53 @@ import java.util.*;
 @Service
 public class GraphMailService {
 
+    // =========================================================================
+    // Logging
+    // =========================================================================
+
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     private static final Logger log = LoggerFactory.getLogger(GraphMailService.class);
+
+    // =========================================================================
+    // Dependencies
+    // =========================================================================
+
+    // Graph WebClient (pre-configured with auth)
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     private final WebClient graphWebClient;
+
+    // SSE progress updates
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     private final MailProgressService progressService;
 
+    // =========================================================================
+    // Constructor
+    // =========================================================================
+
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     public GraphMailService(WebClient graphWebClient, MailProgressService progressService) {
         this.graphWebClient = graphWebClient;
         this.progressService = progressService;
     }
 
+    // =========================================================================
+    // Public API
+    // =========================================================================
+
     /**
-     * Sends a message via Microsoft Graph (BLOCKING, STABLE VERSION)
+     * Sends a message via Microsoft Graph (BLOCKING, STABLE VERSION).
+     *
      * Supports:
-     *  - normal file attachments
-     *  - inline images (CID) for <img src="cid:...">
+     *  - To / CC / BCC recipient lists (comma-separated addresses)
+     *  - Normal file attachments
+     *  - Inline images (CID) for <img src="cid:..."> (Graph fileAttachment with isInline + contentId)
+     *
+     * Notes:
+     *  - Uses /me/sendMail
+     *  - saveToSentItems = true
+     *  - Uses .block() (synchronous) for stability
      */
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     public boolean sendMail(
         String to,
         String cc,
@@ -38,6 +70,7 @@ public class GraphMailService {
         List<InlineImageDTO> inlineImages
     ) {
         try {
+            // Emit "sending" progress (count = -1 indicates "not tied to row progress" in your UI)
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,
@@ -54,6 +87,7 @@ public class GraphMailService {
                 inlineImages != null ? inlineImages.size() : 0
             );
 
+            // Build recipient objects expected by Graph
             List<Map<String, Object>> toRecipients = buildRecipients(to);
             List<Map<String, Object>> ccRecipients = buildRecipients(cc);
             List<Map<String, Object>> bccRecipients = buildRecipients(bcc);
@@ -61,7 +95,9 @@ public class GraphMailService {
             // Graph attachments includes BOTH normal attachments + inline image attachments
             List<Map<String, Object>> graphAttachments = new ArrayList<>();
 
+            // -----------------------------------------------------------------
             // 1) Normal attachments
+            // -----------------------------------------------------------------
             if (attachments != null) {
                 for (AttachmentDTO a : attachments) {
                     if (a == null || a.getFile() == null) continue;
@@ -77,7 +113,9 @@ public class GraphMailService {
                 }
             }
 
+            // -----------------------------------------------------------------
             // 2) Inline images (CID)
+            // -----------------------------------------------------------------
             if (inlineImages != null) {
                 for (InlineImageDTO img : inlineImages) {
                     if (img == null || img.getFile() == null) continue;
@@ -88,13 +126,17 @@ public class GraphMailService {
                     Map<String, Object> attach = new HashMap<>();
                     attach.put("@odata.type", "#microsoft.graph.fileAttachment");
 
+                    // Attachment name shown in Graph payload (not necessarily visible in email clients)
                     String name = img.getName();
                     attach.put("name", (name != null && !name.isBlank()) ? name : (cid + ".png"));
 
+                    // Content type fallback
                     String ct = img.getFileContentType();
                     attach.put("contentType", (ct != null && !ct.isBlank()) ? ct : "image/png");
 
                     attach.put("contentBytes", Base64.getEncoder().encodeToString(img.getFile()));
+
+                    // Key bits for inline images:
                     attach.put("isInline", true);
                     attach.put("contentId", cid.trim()); // MUST match <img src="cid:...">
 
@@ -102,9 +144,13 @@ public class GraphMailService {
                 }
             }
 
+            // -----------------------------------------------------------------
+            // Build Graph message payload
+            // -----------------------------------------------------------------
             Map<String, Object> message = new LinkedHashMap<>();
             message.put("subject", subject != null ? subject : "(no subject)");
             message.put("body", Map.of("contentType", "HTML", "content", body != null ? body : ""));
+
             if (!toRecipients.isEmpty()) message.put("toRecipients", toRecipients);
             if (!ccRecipients.isEmpty()) message.put("ccRecipients", ccRecipients);
             if (!bccRecipients.isEmpty()) message.put("bccRecipients", bccRecipients);
@@ -115,6 +161,9 @@ public class GraphMailService {
                 "saveToSentItems", true
             );
 
+            // -----------------------------------------------------------------
+            // POST /me/sendMail (blocking)
+            // -----------------------------------------------------------------
             graphWebClient.post()
                 .uri("/me/sendMail")
                 .bodyValue(payload)
@@ -124,6 +173,7 @@ public class GraphMailService {
 
             log.info("✅ Email sent successfully to {}", to);
 
+            // Emit success
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,
@@ -139,6 +189,7 @@ public class GraphMailService {
         } catch (Exception e) {
             log.error("❌ Failed to send email: {}", e.getMessage(), e);
 
+            // Emit failure
             progressService.sendProgress(
                 new MailProgressEvent(
                     to,
@@ -153,20 +204,30 @@ public class GraphMailService {
         }
     }
 
-    /** Utility: convert comma-separated addresses into recipient objects */
+    // =========================================================================
+    // Helpers
+    // =========================================================================
+
+    /** Utility: convert comma-separated addresses into Graph recipient objects. */
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     private List<Map<String, Object>> buildRecipients(String addresses) {
         if (addresses == null || addresses.isBlank()) return List.of();
+
+        // Split on commas, tolerating spaces
         String[] parts = addresses.split(",\\s*");
 
         List<Map<String, Object>> recipients = new ArrayList<>();
         for (String addr : parts) {
             if (!addr.isBlank()) {
                 recipients.add(
-                    Map.of("emailAddress",
-                        Map.of("address", addr.trim()))
+                    Map.of(
+                        "emailAddress",
+                        Map.of("address", addr.trim())
+                    )
                 );
             }
         }
+
         return recipients;
     }
 }

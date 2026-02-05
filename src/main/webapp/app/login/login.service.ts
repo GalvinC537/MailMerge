@@ -7,6 +7,7 @@ import { Logout } from './logout.model';
 @Injectable({ providedIn: 'root' })
 export class LoginService {
   private readonly location = inject(Location);
+
   private readonly authServerProvider = inject(AuthServerProvider);
 
   login(): void {
