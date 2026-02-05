@@ -3,7 +3,6 @@ package mailmerge.service.dto;
 public class AIRewriteResponse {
     private String rewrittenText;
 
-    // ✅ Required by Jackson
     public AIRewriteResponse() {}
 
     // ✅ Optional convenience constructor

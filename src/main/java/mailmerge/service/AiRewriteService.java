@@ -14,8 +14,20 @@ import org.springframework.web.reactive.function.client.WebClient;
 @Service
 public class AiRewriteService {
 
+    // =========================================================================
+    // HTTP client (Groq OpenAI-compatible endpoint)
+    // =========================================================================
+
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     private final WebClient webClient;
 
+    /**
+     * Constructs a WebClient configured for Groq's OpenAI-compatible API.
+     * - Base URL points at Groq's /openai/v1
+     * - Auth header uses Bearer token from application properties
+     * - Content-Type defaults to JSON
+     */
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     public AiRewriteService(@Value("${groq.api-key}") String apiKey) {
         this.webClient = WebClient.builder()
             .baseUrl("https://api.groq.com/openai/v1")
@@ -24,17 +36,35 @@ public class AiRewriteService {
             .build();
     }
 
+    // =========================================================================
+    // Public API
+    // =========================================================================
+
+    /**
+     * Rewrites the provided email text using the requested tone.
+     * Enforces your "markdown-ish" formatting + placeholder preservation rules by
+     * embedding strict instructions in the prompt.
+     *
+     * @param original the original email body (markdown-ish text with tokens)
+     * @param tone     "professional", "friendly", or a custom free-text style
+     * @return DTO containing rewrittenText (or empty string on unexpected responses)
+     */
+    // eslint-disable-next-line @typescript-eslint/member-ordering
     public AIRewriteResponse rewrite(String original, String tone) {
+        // Choose the high-level tone instruction that leads the LLM
         String styleInstruction;
 
+        // Default to professional when tone is missing/blank
         if (tone == null || tone.isBlank() || "professional".equalsIgnoreCase(tone)) {
             styleInstruction = "Rewrite this email in a polished, professional tone.";
         } else if ("friendly".equalsIgnoreCase(tone)) {
             styleInstruction = "Rewrite this email in a friendly, positive, approachable tone.";
         } else {
+            // Custom tone: user-supplied style text (e.g. "more concise, persuasive")
             styleInstruction = "Rewrite this email using the following writing style: " + tone + ".";
         }
 
+        // Build the prompt content with strict rules so formatting/tokens survive intact
         String userContent =
             styleInstruction +
                 "\n\nFORMAT & PLACEHOLDER RULES:\n" +
@@ -59,6 +89,7 @@ public class AiRewriteService {
                 "   - Do NOT add explanations, intros, quotes, or labels.\n\n" +
                 "Email:\n" + original;
 
+        // Build a Chat Completions request (OpenAI-compatible schema)
         Map<String, Object> request = Map.of(
             "model", "llama-3.3-70b-versatile",
             "messages", List.of(
@@ -67,9 +98,11 @@ public class AiRewriteService {
                     "content", userContent
                 )
             ),
+            // Moderate temperature: some rewrite creativity but tries to respect strict constraints
             "temperature", 0.4
         );
 
+        // Execute the POST (blocking) and parse into a generic Map so we can extract choices[].message.content
         Map<String, Object> response = webClient.post()
             .uri("/chat/completions")
             .bodyValue(request)
@@ -77,19 +110,24 @@ public class AiRewriteService {
             .bodyToMono(new ParameterizedTypeReference<Map<String, Object>>() {})
             .block();
 
+        // Defensive extraction: choices may be missing or empty if upstream fails oddly
         @SuppressWarnings("unchecked")
-        List<Map<String, Object>> choices = (List<Map<String, Object>>) response.get("choices");
+        List<Map<String, Object>> choices = response != null
+            ? (List<Map<String, Object>>) response.get("choices")
+            : null;
 
         if (choices == null || choices.isEmpty()) {
+            // Return an empty rewrite rather than throwing (caller can show error UI if desired)
             return new AIRewriteResponse("");
         }
 
+        // choices[0].message.content is where the rewritten text usually is
         @SuppressWarnings("unchecked")
         Map<String, Object> message = (Map<String, Object>) choices.get(0).get("message");
 
         String content = message != null ? (String) message.get("content") : "";
 
-        // Strip surrounding quotes if returned
+        // Some models/providers may wrap the entire output in quotes; strip only if BOTH ends are quotes
         if (content != null) {
             content = content.trim();
             if (content.startsWith("\"") && content.endsWith("\"")) {
@@ -97,6 +135,7 @@ public class AiRewriteService {
             }
         }
 
+        // Map to your DTO
         AIRewriteResponse dto = new AIRewriteResponse();
         dto.setRewrittenText(content != null ? content : "");
         return dto;

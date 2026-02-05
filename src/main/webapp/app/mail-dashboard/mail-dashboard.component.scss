@@ -1,5 +1,5 @@
 /* =========================================================
-   MailMerge dashboard (improved) — drop-in replacement
+   MailMerge dashboard — drop-in replacement (DEDUPED + FIXED)
    Keeps existing class names & behavior
    ========================================================= */
 
@@ -10,11 +10,71 @@
   min-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px));
   transition: grid-template-columns 180ms ease;
   background: var(--mm-panel);
-}
 
-/* Collapsed state */
-.mailmerge-shell.mm-sidebar-collapsed {
-  grid-template-columns: 72px 1fr; /* slightly roomier than 64px for icons */
+  &.mm-sidebar-collapsed {
+    grid-template-columns: 72px 1fr; /* slightly roomier than 64px for icons */
+
+    .mm-sidebar {
+      padding: 14px 8px;
+    }
+
+    /* Hide sidebar text blocks when collapsed */
+    .mm-sidebar-title,
+    .mm-project-name,
+    .mm-project-meta,
+    .mm-empty,
+    .mm-new-project-text {
+      display: none;
+    }
+
+    /* Center items nicely in collapsed mode */
+    .mm-new-project {
+      justify-content: center;
+    }
+
+    /* Make project buttons feel like icon chips when collapsed */
+    .mm-project-item {
+      padding: 10px 0;
+      justify-content: center;
+
+      &.active {
+        box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.22);
+      }
+    }
+
+    /* Keep the + visible */
+    .mm-plus {
+      width: 34px;
+      height: 34px;
+    }
+
+    /* Collapsed mode tweaks for folders + search */
+    .mm-project-search {
+      padding: 6px 0 10px;
+    }
+
+    .mm-project-search-input {
+      padding: 9px 0;
+      text-align: center;
+    }
+
+    .mm-folder {
+      justify-content: center;
+      padding: 10px 0;
+    }
+
+    .mm-folder-name {
+      display: none;
+    }
+
+    .mm-folder-count {
+      margin-left: 0;
+    }
+
+    .mm-folder-caret {
+      display: none;
+    }
+  }
 }
 
 /* Sidebar panel */
@@ -24,45 +84,13 @@
   padding: 14px 12px;
   min-width: 0;
 
-  /* ✅ NEW: nicer layout + contained scrolling */
+  /* nicer layout + contained scrolling */
   display: flex;
   flex-direction: column;
   gap: 10px;
   max-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px));
   overflow-y: auto;
   scrollbar-gutter: stable;
-}
-
-/* When collapsed, tighten padding */
-.mailmerge-shell.mm-sidebar-collapsed .mm-sidebar {
-  padding: 14px 8px;
-}
-
-/* Hide sidebar text blocks when collapsed */
-.mailmerge-shell.mm-sidebar-collapsed .mm-sidebar-title,
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-name,
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-meta,
-.mailmerge-shell.mm-sidebar-collapsed .mm-empty,
-.mailmerge-shell.mm-sidebar-collapsed .mm-new-project-text {
-  display: none;
-}
-
-/* Center items nicely in collapsed mode */
-.mailmerge-shell.mm-sidebar-collapsed .mm-new-project {
-  justify-content: center;
-}
-
-/* Make project buttons feel like icon chips when collapsed */
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-item {
-  padding: 10px 0;
-  display: flex;
-  justify-content: center;
-}
-
-/* Keep the + visible */
-.mailmerge-shell.mm-sidebar-collapsed .mm-plus {
-  width: 34px;
-  height: 34px;
 }
 
 /* Main content */
@@ -101,11 +129,9 @@
   color: var(--mm-text);
 }
 
-/* New project button */
 /* =========================================================
    New Project — primary action (matches Send / Save)
    ========================================================= */
-
 .mm-new-project {
   width: 100%;
   display: flex;
@@ -121,46 +147,37 @@
   border-radius: 14px;
   font-weight: 800;
 
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.08),
-    0 6px 14px rgba(0, 188, 212, 0.25);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 6px 14px rgba(0, 188, 212, 0.25);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
 
-  transition:
-    background-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 120ms ease;
+  &:hover {
+    background: #00acc1;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 10px 22px rgba(0, 188, 212, 0.35);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 4px 10px rgba(0, 188, 212, 0.3);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
 }
 
-.mm-new-project:hover {
-  background: #00acc1;
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.12),
-    0 10px 22px rgba(0, 188, 212, 0.35);
-}
-
-.mm-new-project:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.16),
-    0 4px 10px rgba(0, 188, 212, 0.3);
-}
-
-.mm-new-project:focus-visible {
-  outline: none;
-  box-shadow: var(--mm-focus);
+.mm-new-project-text {
+  min-width: 0;
 }
 
 .mm-plus {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-
   width: 32px;
   height: 32px;
-
   border-radius: 10px;
 
-  /* make it clearly visible */
   background: rgba(255, 255, 255, 0.28);
   border: 1px solid rgba(255, 255, 255, 0.45);
 
@@ -168,13 +185,7 @@
   font-size: 20px;
   font-weight: 900;
   line-height: 1;
-
-  /* avoid it being shrunk/clipped in flex */
   flex: 0 0 auto;
-}
-
-.mm-new-project-text {
-  min-width: 0;
 }
 
 /* Sidebar section title */
@@ -184,19 +195,17 @@
   text-transform: uppercase;
   font-weight: 800;
   color: var(--mm-muted);
-  padding: 0 6px;
+  padding: 6px 6px;
   margin-top: 10px;
 
-  /* ✅ NEW: sticky title */
+  /* sticky title */
   position: sticky;
   top: 0;
   background: var(--mm-bg);
-  padding-top: 6px;
-  padding-bottom: 6px;
   z-index: 2;
 }
 
-/* ✅ NEW: Search bar styling + sticky placement */
+/* Search bar styling + sticky placement */
 .mm-project-search {
   padding: 8px 10px 10px;
 
@@ -227,7 +236,6 @@
 
 /* Projects list */
 .mm-projects-list {
-  /* ✅ CHANGED: stop each list from having its own scroll */
   overflow-y: visible;
   padding-right: 2px;
   margin-top: 8px;
@@ -237,19 +245,23 @@
   gap: 8px;
 }
 
+/* IMPORTANT: HTML uses .mm-project-item containing .mm-project-main + .mm-project-delete */
 .mm-project-item {
   text-align: left;
   width: 100%;
 
-  /* ✅ NEW: subtle card feel */
   border: 1px solid rgba(0, 0, 0, 0.04);
   background: rgba(255, 255, 255, 0);
 
   border-radius: 12px;
   padding: 10px 10px;
 
-  display: grid;
-  gap: 4px;
+  /* final layout: flex (your HTML expects delete aligned right) */
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+
   transition: background-color 160ms ease, border-color 160ms ease, box-shadow 160ms ease;
 
   &:hover {
@@ -268,6 +280,11 @@
   }
 }
 
+.mm-project-main {
+  flex: 1;
+  min-width: 0;
+}
+
 .mm-project-name {
   font-weight: 750;
   line-height: 1.2;
@@ -278,7 +295,6 @@
   font-size: 0.85rem;
   color: var(--mm-muted);
 
-  /* ✅ NEW: status pill */
   .mm-status {
     display: inline-flex;
     align-items: center;
@@ -294,11 +310,29 @@
   }
 }
 
+.mm-project-delete {
+  border: 0;
+  background: transparent;
+  padding: 6px;
+  border-radius: 6px;
+  color: var(--mm-muted);
+  flex: 0 0 auto;
+
+  &:hover {
+    background: var(--mm-hover);
+    color: var(--mm-danger);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
 .mm-empty {
   color: var(--mm-muted);
   padding: 12px 6px;
 }
-
 
 /* Title truncation + hierarchy */
 .mm-project-title {
@@ -313,7 +347,7 @@
 
 /* Select */
 .mm-select {
-  width: 180px;
+  width: 150px;
   border-radius: 12px;
   border: 1px solid var(--mm-border);
 
@@ -337,7 +371,7 @@
   a {
     color: var(--mm-text);
     text-decoration: none;
-    max-width: 260px;
+    max-width: 160px;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -346,12 +380,6 @@
       text-decoration: underline;
     }
   }
-}
-
-/* Ensure the pill truncates nicely inside flex */
-.mm-toolbar-pill {
-  min-width: 0;
-  max-width: 520px;
 }
 
 /* Buttons */
@@ -419,6 +447,50 @@
   }
 }
 
+.mm-btn-primary {
+  background: var(--mm-primary);
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-weight: 800;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.08), 0 6px 14px rgba(0, 188, 212, 0.25);
+  transition: background-color 160ms ease, box-shadow 160ms ease, transform 120ms ease;
+
+  &:hover {
+    background: #00acc1;
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.12), 0 10px 22px rgba(0, 188, 212, 0.35);
+  }
+
+  &:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 0 rgba(0, 0, 0, 0.16), 0 4px 10px rgba(0, 188, 212, 0.3);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+    box-shadow: none;
+    cursor: not-allowed;
+  }
+}
+
+.mm-btn-excel {
+  background: #217346; /* Excel green */
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  font-weight: 700;
+
+  &:hover {
+    filter: brightness(0.95);
+  }
+
+  &:active {
+    transform: translateY(1px);
+  }
+
+  &:disabled {
+    opacity: 0.6;
+  }
+}
+
 .mm-badge {
   font-size: 0.75rem;
   font-weight: 800;
@@ -438,9 +510,17 @@
   margin-top: 6px;
 }
 
-/* NEW: warning style used in your HTML */
+.mm-ok {
+  color: #2e7d32;
+}
+
+.mm-bad {
+  color: var(--mm-danger);
+}
+
+/* warning style used in HTML */
 .mm-warn {
-  color: #8a6d00; /* readable amber */
+  color: #8a6d00;
   font-weight: 750;
 
   .mm-link {
@@ -567,7 +647,7 @@
   border: 1px solid var(--mm-border);
   background: var(--mm-bg);
   border-radius: 14px;
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.10);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.1);
   padding: 6px;
 }
 
@@ -597,14 +677,6 @@
   align-items: center;
   font-weight: 750;
   flex-wrap: wrap;
-}
-
-.mm-ok {
-  color: #2e7d32;
-}
-
-.mm-bad {
-  color: var(--mm-danger);
 }
 
 /* Progress */
@@ -680,7 +752,6 @@
   opacity: 0.85;
 }
 
-/* Hide placeholder on focus */
 .mm-line-editor:focus:empty::before,
 .mm-body-editor:focus:empty::before {
   content: '';
@@ -808,7 +879,7 @@
   color: var(--mm-text);
 }
 
-/* Preview attachments chips (used in your HTML) */
+/* Preview attachments chips */
 .mm-preview-attachments {
   color: var(--mm-text);
 }
@@ -849,56 +920,7 @@
   text-decoration: underline !important;
 }
 
-/* =========================================================
-   Responsive improvements (toolbar + layout)
-   ========================================================= */
-
-@media (max-width: 1100px) {
-  /* Let toolbar wrap naturally and remove dividers */
-  .mm-toolbar-tools {
-    margin-left: 0;
-  }
-
-  .mm-toolbar-project::after,
-  .mm-toolbar-sheet::after,
-  .mm-toolbar-format::after {
-    display: none;
-  }
-}
-
-@media (max-width: 720px) {
-  .mailmerge-shell {
-    grid-template-columns: 1fr; /* stack sidebar & main */
-  }
-
-  .mm-sidebar {
-    border-right: 0;
-    border-bottom: 1px solid var(--mm-border);
-  }
-
-  .mm-toolbar {
-    align-items: flex-start;
-  }
-
-  .mm-toolbar-project,
-  .mm-toolbar-sheet,
-  .mm-toolbar-format,
-  .mm-toolbar-tools {
-    flex: 1 1 100%;
-    margin-left: 0;
-    padding-right: 0;
-  }
-
-  .mm-select {
-    width: 100%;
-    max-width: 360px;
-  }
-}
-
-/* =========================================================
-   Folder UI (your existing feature) — improved look
-   ========================================================= */
-
+/* Folder UI */
 .mm-folder {
   width: 100%;
   display: flex;
@@ -958,43 +980,7 @@
   opacity: 0.7;
 }
 
-/* Collapsed mode tweaks for folders + search */
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-search {
-  padding: 6px 0 10px;
-}
-
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-search-input {
-  padding: 9px 0;
-  text-align: center;
-}
-
-.mailmerge-shell.mm-sidebar-collapsed .mm-folder {
-  justify-content: center;
-  padding: 10px 0;
-}
-
-.mailmerge-shell.mm-sidebar-collapsed .mm-folder-name {
-  display: none;
-}
-
-.mailmerge-shell.mm-sidebar-collapsed .mm-folder-count {
-  margin-left: 0;
-}
-
-.mailmerge-shell.mm-sidebar-collapsed .mm-folder-caret {
-  display: none;
-}
-
-/* Optional: make collapsed active project feel "selected" */
-.mailmerge-shell.mm-sidebar-collapsed .mm-project-item.active {
-  box-shadow: 0 0 0 3px rgba(0, 188, 212, 0.22);
-}
-
-
-/* =========================================================
-   Toolbar (ONE LINE, better spacing)
-   ========================================================= */
-
+/* Toolbar */
 .mm-toolbar {
   display: flex;
   align-items: center;
@@ -1010,7 +996,10 @@
   min-width: 0;
 }
 
-/* shared segment styling */
+.mm-toolbar--sheetonly {
+  justify-content: flex-start;
+}
+
 .mm-toolbar-seg {
   display: flex;
   align-items: center;
@@ -1019,166 +1008,220 @@
   flex: 0 0 auto;
 }
 
-/* 1) Project: shrinkable */
-.mm-toolbar-project {
-  flex: 0 1 220px; /* ✅ give LESS space than before */
-  justify-content: flex-start;
+/* Make sheet segment able to expand (preview sits under) */
+.mm-toolbar-sheet {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
 }
 
-/* Make title truncate earlier so tools stay on one line */
-.mm-project-title {
-  max-width: 160px; /* ✅ key change */
+/* Spreadsheet connected row */
+.mm-sheet-connected {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* BIG triangle */
+.mm-sheet-caret-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  border: 1px solid var(--mm-border);
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--mm-text);
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+.mm-sheet-name {
+  color: var(--mm-text);
+  text-decoration: none;
+  font-weight: 800;
+  min-width: 0;
+  flex: 1 1 auto;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  &:hover {
+    text-decoration: underline;
+  }
 }
 
-/* 2) Spreadsheet: shrinkable */
-.mm-toolbar-sheet {
-  flex: 0 1 280px; /* ✅ give LESS space than before */
-  justify-content: flex-start;
+/* Inline sheet preview uses .mm-sheet-preview + .mm-sheet-scroll in your HTML */
+.mm-sheet-preview {
+  width: 100%;
+  margin-top: 10px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-bg);
+  border-radius: 14px;
+  padding: 10px;
 }
 
-/* tighter select so it doesn't steal space */
-.mm-select {
-  width: 150px; /* ✅ was 180px */
+.mm-sheet-scroll {
+  max-height: 420px;
+  overflow: auto;
 }
 
-/* pill truncation tighter */
-.mm-pill a {
-  max-width: 160px; /* ✅ was 260px */
+.mm-sheet-table {
+  width: max-content;
+  min-width: 100%;
+  margin: 0;
 }
 
-/* 3) Format: fixed, centered-ish */
-.mm-toolbar-format {
-  flex: 0 0 auto;
-  justify-content: flex-start;
-}
-
-/* 4) Tools: takes remaining space, NEVER wraps */
-.mm-toolbar-tools {
-  flex: 1 1 auto;
-  justify-content: flex-end;
-  flex-wrap: nowrap;
+.mm-sheet-table th,
+.mm-sheet-table td {
   white-space: nowrap;
-
-  /* ✅ if it *ever* can't fit, scroll horizontally instead of wrapping */
-  overflow-x: auto;
-  overflow-y: hidden;
-  scrollbar-width: thin;
 }
 
-/* Make the right-side tool buttons more compact so they fit */
-.mm-toolbar-tools .mm-btn {
-  padding: 8px 8px; /* ✅ slightly tighter */
-  border-radius: 12px;
-}
-
-/* Optional: keep icons aligned when scrolling */
-.mm-toolbar-tools::-webkit-scrollbar {
-  height: 6px;
-}
-
-@media (max-width: 1100px) {
-  .mm-toolbar {
-    flex-wrap: wrap; /* allow wrap on smaller screens only */
-  }
-
-  .mm-toolbar-project,
-  .mm-toolbar-sheet,
-  .mm-toolbar-format {
-    flex: 1 1 320px;
-  }
-
-  .mm-toolbar-tools {
-    flex: 1 1 100%;
-    justify-content: flex-start;
-  }
-
-  .mm-project-title {
-    max-width: 420px;
-  }
-}
-
-/* =========================================================
-   Primary action button (Outlook-style)
-   ========================================================= */
-
-.mm-btn-primary {
-  background: var(--mm-primary);
-  color: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  font-weight: 800;
-
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.08),
-    0 6px 14px rgba(0, 188, 212, 0.25);
-
-  transition:
-    background-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 120ms ease;
-}
-
-.mm-btn-primary:hover {
-  background: #00acc1; /* slightly darker cyan */
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.12),
-    0 10px 22px rgba(0, 188, 212, 0.35);
-}
-
-.mm-btn-primary:active {
-  transform: translateY(1px);
-  box-shadow:
-    0 1px 0 rgba(0, 0, 0, 0.16),
-    0 4px 10px rgba(0, 188, 212, 0.3);
-}
-
-.mm-btn-primary:disabled {
-  opacity: 0.6;
-  box-shadow: none;
-  cursor: not-allowed;
-}
-
-.mm-modal-backdrop {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.35);
+/* Formatting bar */
+.mm-format-bar {
   display: flex;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  gap: 6px;
+  padding: 8px 10px;
+  border-top: 1px solid var(--mm-border);
+  border-bottom: 1px solid var(--mm-border);
+  background: var(--mm-panel);
 }
 
-.mm-modal {
-  width: 100%;
-  max-width: 420px;
-  background: var(--mm-bg);
-  border-radius: 16px;
-  padding: 18px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.25);
+.mm-format-divider {
+  width: 1px;
+  height: 20px;
+  background: var(--mm-border);
+  margin: 0 6px;
 }
 
-.mm-modal h3 {
-  margin-bottom: 12px;
-  font-weight: 850;
-}
-
-.mm-input {
-  width: 100%;
-  padding: 10px 12px;
-  border-radius: 12px;
+/* Bottom split */
+.mm-bottom-split {
+  position: static;
+  margin-top: 12px;
+  padding: 10px;
   border: 1px solid var(--mm-border);
-  margin-bottom: 16px;
+  border-radius: 14px;
+  background: var(--mm-bg);
+  box-shadow: none;
 }
 
-.mm-modal-actions {
-  display: flex;
-  justify-content: flex-end;
+.mm-bottom-split-grid {
+  display: grid;
+  grid-template-columns: 1fr;
   gap: 10px;
+  min-width: 0;
 }
 
-/* Modal */
+.mm-collapsible {
+  border: 1px solid var(--mm-border);
+  border-radius: 14px;
+  background: var(--mm-panel);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.mm-collapsible-header {
+  width: 100%;
+  border: 0;
+  background: var(--mm-bg);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  font-weight: 900;
+  color: var(--mm-text);
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: var(--mm-focus);
+  }
+}
+
+.mm-collapsible-body {
+  padding: 10px 12px;
+  border-top: 1px solid var(--mm-border);
+  max-height: 340px;
+  overflow: auto;
+}
+
+.mm-bottom-panel-header {
+  width: 100%;
+  border: 0;
+  background: var(--mm-bg);
+  padding: 10px 12px;
+}
+
+.mm-bottom-panel-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Draggable conditional snippets */
+.mm-draggable {
+  user-select: none;
+  cursor: grab;
+  padding: 8px 10px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px;
+  margin-bottom: 8px;
+  background: #fff;
+
+  &:active {
+    cursor: grabbing;
+  }
+}
+
+/* Toast */
+.mm-toast {
+  position: sticky;
+  top: 8px;
+  z-index: 60;
+  margin: 8px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-weight: 600;
+  border: 1px solid var(--mm-border);
+  background: #fff;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
+
+  &.mm-toast-ok {
+    border-color: #2e7d32;
+  }
+
+  &.mm-toast-warn {
+    border-color: #ed6c02;
+  }
+
+  &.mm-toast-error {
+    border-color: #d32f2f;
+  }
+}
+
+/* Modals (single canonical definition) */
 .mm-modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1231,404 +1274,34 @@
   border-top: 1px solid var(--mm-border);
 }
 
-/* Primary button (same vibe as Send/Save) */
-.mm-btn-primary {
-  background: var(--mm-primary);
-  color: #fff;
-  border-color: rgba(0, 0, 0, 0.08);
-
-  &:hover {
-    filter: brightness(0.96);
-  }
-}
-
-.mm-toast {
-  position: sticky;
-  top: 8px;
-  z-index: 60;
-  margin: 8px 0;
+.mm-input {
+  width: 100%;
   padding: 10px 12px;
-  border-radius: 10px;
-  font-weight: 600;
-  border: 1px solid var(--mm-border);
-  background: #fff;
-  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.08);
-}
-
-.mm-toast-ok {
-  border-color: #2e7d32;
-}
-
-.mm-toast-warn {
-  border-color: #ed6c02;
-}
-
-.mm-toast-error {
-  border-color: #d32f2f;
-}
-
-.mm-project-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-}
-
-.mm-project-main {
-  flex: 1;
-  min-width: 0;
-}
-
-.mm-project-delete {
-  border: 0;
-  background: transparent;
-  padding: 6px;
-  border-radius: 6px;
-  color: var(--mm-muted);
-  flex: 0 0 auto;
-}
-
-.mm-project-delete:hover {
-  background: var(--mm-hover);
-  color: var(--mm-danger);
-}
-
-.mm-project-delete:focus-visible {
-  outline: none;
-  box-shadow: var(--mm-focus);
-}
-
-/* ✅ Formatting bar between Subject and Body */
-.mm-format-bar {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 10px;
-  border-top: 1px solid var(--mm-border);
-  border-bottom: 1px solid var(--mm-border);
-  background: var(--mm-panel);
-}
-
-.mm-format-divider {
-  width: 1px;
-  height: 20px;
-  background: var(--mm-border);
-  margin: 0 6px;
-}
-
-/* ✅ Bottom pinned tools */
-.mm-bottom-tools {
-  position: sticky; /* stays at bottom while scrolling inside page */
-  bottom: 0;
-  z-index: 50;
-
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  justify-content: flex-end;
-
-  padding: 10px 12px;
-  margin-top: 12px;
-
-  border: 1px solid var(--mm-border);
-  border-radius: 14px;
-  background: var(--mm-bg);
-  box-shadow: 0 -10px 24px rgba(0, 0, 0, 0.06);
-}
-
-.mm-toolbar--sheetonly {
-  justify-content: flex-start;
-}
-
-/* Spreadsheet dropdown wrapper (same vibe as Send/Save) */
-.mm-sheet-dropdown {
-  position: relative;
-}
-
-/* Caret button inside pill */
-.mm-sheet-pill {
-  align-items: center;
-}
-
-.mm-sheet-caret {
-  border: 0;
-  background: transparent;
-  color: var(--mm-muted);
-  font-weight: 900;
-  padding: 4px 6px;
-  border-radius: 10px;
-  line-height: 1;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-
-  &:hover {
-    background: var(--mm-hover);
-    color: var(--mm-text);
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--mm-focus);
-  }
-}
-
-/* Expanding preview under the pill */
-.mm-sheet-preview {
-  margin-top: 10px;
-  border: 1px solid var(--mm-border);
-  background: var(--mm-bg);
-  border-radius: 14px;
-  padding: 10px;
-}
-
-.mm-sheet-preview-scroll {
-  max-height: 220px; /* ≈ header + ~5 rows */
-  overflow: auto;
   border-radius: 12px;
+  border: 1px solid var(--mm-border);
+  margin-bottom: 16px;
 }
 
-/* Sticky header while scrolling */
-.mm-sheet-preview-scroll thead th {
-  position: sticky;
-  top: 0;
-  background: var(--mm-bg);
-  z-index: 1;
-}
-
-/* Spreadsheet connected row (no grey pill) */
-.mm-sheet-connected {
-  width: 100%;
+.mm-modal-actions {
   display: flex;
-  align-items: center;
+  justify-content: flex-end;
   gap: 10px;
-  min-width: 0;
 }
 
-/* BIG triangle */
-.mm-sheet-caret-btn {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--mm-border);
-  background: transparent;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 20px;  /* ✅ bigger */
-  font-weight: 900; /* ✅ clearer */
-  line-height: 1;
-  color: var(--mm-text);
-
-  &:hover {
-    background: var(--mm-hover);
+/* Responsive */
+@media (max-width: 720px) {
+  .mailmerge-shell {
+    grid-template-columns: 1fr;
   }
 
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--mm-focus);
+  .mm-sidebar {
+    border-right: 0;
+    border-bottom: 1px solid var(--mm-border);
   }
 }
 
-.mm-sheet-icon {
-  opacity: 0.9;
-}
-
-.mm-sheet-name {
-  color: var(--mm-text);
-  text-decoration: none;
-  font-weight: 800;
-  min-width: 0;
-  flex: 1 1 auto;
-
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-
-  &:hover {
-    text-decoration: underline;
-  }
-}
-
-/* Make the toolbar sheet segment able to expand */
-.mm-toolbar-sheet {
-  flex: 1 1 auto;     /* ✅ was shrinky */
-  min-width: 0;
-  display: flex;
-  flex-direction: column; /* ✅ lets preview sit under row and fill width */
-  align-items: stretch;
-}
-
-/* Expanded preview area */
-.mm-sheet-preview {
-  width: 100%;
-  margin-top: 10px;
-  border: 1px solid var(--mm-border);
-  background: var(--mm-bg);
-  border-radius: 14px;
-  padding: 10px;
-
-  /* ✅ show 5 rows then scroll if more (header stays visible) */
-  max-height: 220px;
-  overflow: auto;
-}
-
-.mm-sheet-preview table {
-  width: 100%;
-  table-layout: auto;
-  margin: 0;
-}
-
-.mm-btn-excel {
-  background: #217346; /* Excel green */
-  color: #fff;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  font-weight: 700;
-
-  &:hover { filter: brightness(0.95); }
-  &:active { transform: translateY(1px); }
-  &:disabled { opacity: 0.6; }
-}
-
-/* =========================================================
-   Bottom split panels: Preview (left) + AI (right)
-   ========================================================= */
-.mm-bottom-split {
-  /* was: position: sticky; bottom: 0; z-index: 55; */
-  position: static; /* or just remove position entirely */
-  margin-top: 12px;
-  padding: 10px;
-
-  border: 1px solid var(--mm-border);
-  border-radius: 14px;
-  background: var(--mm-bg);
-
-  /* optional: remove the "floating" look */
-  box-shadow: none;
-}
-
-.mm-bottom-split-grid {
-  display: grid;
-  grid-template-columns: 1fr; /* ✅ single column */
-  gap: 10px;
-  min-width: 0;
-}
-
-.mm-collapsible {
-  border: 1px solid var(--mm-border);
-  border-radius: 14px;
-  background: var(--mm-panel);
-  overflow: hidden;
-  min-width: 0;
-}
-
-.mm-collapsible-header {
-  width: 100%;
-  border: 0;
-  background: var(--mm-bg);
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-
-  padding: 10px 12px;
-  font-weight: 900;
-  color: var(--mm-text);
-
-  &:hover {
-    background: var(--mm-hover);
-  }
-
-  &:focus-visible {
-    outline: none;
-    box-shadow: var(--mm-focus);
-  }
-}
-
-.mm-collapsible-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.mm-collapsible-caret {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--mm-border);
-  background: transparent;
-
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-
-  font-size: 20px;
-  font-weight: 900;
-  line-height: 1;
-  color: var(--mm-text);
-}
-
-.mm-collapsible-body {
-  padding: 10px 12px;
-  border-top: 1px solid var(--mm-border);
-
-  /* keep it usable and not infinite */
-  max-height: 340px;
-  overflow: auto;
-}
-
-/* tighter preview cards inside the bottom area */
-.mm-bottom-split .mm-preview-item {
-  padding: 10px;
-}
-
-/* Responsive: stack on mobile */
 @media (max-width: 900px) {
   .mm-bottom-split-grid {
     grid-template-columns: 1fr;
   }
 }
-
-/* Bottom panel header to mimic the spreadsheet connected row vibe */
-.mm-bottom-panel-header {
-  width: 100%;
-  border: 0;
-  background: var(--mm-bg);
-  padding: 10px 12px;
-}
-
-.mm-bottom-panel-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.mm-sheet-scroll {
-  max-height: 420px; /* pick your preferred height */
-  overflow: auto;    /* enables vertical + horizontal scrolling */
-}
-
-.mm-sheet-table {
-  width: max-content; /* prevents squishing; table grows as needed */
-  min-width: 100%;
-}
-
-.mm-sheet-table th,
-.mm-sheet-table td {
-  white-space: nowrap; /* keeps columns readable; forces horizontal scroll */
-}
-
-.mm-draggable {
-  user-select: none;
-  cursor: grab;
-  padding: 8px 10px;
-  border: 1px solid rgba(0,0,0,0.1);
-  border-radius: 10px;
-  margin-bottom: 8px;
-  background: #fff;
-}
-.mm-draggable:active { cursor: grabbing; }

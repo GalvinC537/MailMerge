@@ -22,23 +22,43 @@ import { faBug } from '@fortawesome/free-solid-svg-icons';
 })
 export default class NavbarComponent implements OnInit {
   inProduction?: boolean;
+
   isNavbarCollapsed = signal(true);
+
   openAPIEnabled?: boolean;
+
   version = '';
+
   account = inject(AccountService).trackCurrentAccount();
+
   entitiesNavbarItems: NavbarItem[] = [];
 
   faBug = faBug;
+
+  // ===========================================================================
   // Signature modal state
+  // ===========================================================================
+
   signatureModalOpen = false;
+
   signatureDraft = '';
+
   signatureSaving = false;
+
   signatureError: string | null = null;
 
+  // ===========================================================================
+  // Services / DI
+  // ===========================================================================
+
   private readonly loginService = inject(LoginService);
+
   private readonly profileService = inject(ProfileService);
+
   private readonly router = inject(Router);
+
   private readonly themeService = inject(ThemeService);
+
   private readonly signatureService = inject(SignatureService);
 
   constructor() {
@@ -65,9 +85,9 @@ export default class NavbarComponent implements OnInit {
     this.themeService.toggleTheme();
   }
 
-  // -----------------------
+  // ===========================================================================
   // Signature modal
-  // -----------------------
+  // ===========================================================================
   openSignatureModal(): void {
     // Only logged-in users should reach here because template hides it,
     // but keep it safe.
@@ -113,6 +133,9 @@ export default class NavbarComponent implements OnInit {
     });
   }
 
+  // ===========================================================================
+  // Navbar actions
+  // ===========================================================================
   collapseNavbar(): void {
     this.isNavbarCollapsed.set(true);
   }

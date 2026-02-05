@@ -1,0 +1,34 @@
+.mm-page {
+  padding: 18px 0;
+  background: var(--mm-panel);
+  min-height: calc(100vh - var(--app-header-height, 0px) - var(--app-footer-height, 0px));
+}
+
+.mm-policy {
+  background: var(--mm-bg);
+  border: 1px solid var(--mm-border);
+  border-radius: 14px;
+  padding: 18px;
+}
+
+.mm-muted {
+  color: var(--mm-muted);
+}
+
+h1 {
+  margin-bottom: 10px;
+  font-weight: 900;
+  color: var(--mm-text);
+}
+
+h2 {
+  margin-top: 18px;
+  font-weight: 850;
+  color: var(--mm-text);
+}
+
+p,
+li {
+  color: var(--mm-text);
+  line-height: 1.6;
+}

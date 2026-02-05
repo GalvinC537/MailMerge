@@ -1,7 +1,25 @@
-<!-- mail-dashboard.component.html -->
+<!-- =========================================================================
+  FILE: mail-dashboard.component.html
+  Purpose:
+  - Left sidebar: list + search + folders for MailMerge projects
+  - Main area: spreadsheet connect, send/save, compose editor, preview + AI panels
+  - Modals: create project, insert link, delete project confirmation
+
+  Notes:
+  - Most UI actions call methods in mail-dashboard.component.ts (e.g. toggleSidebar(), saveProject()).
+  - Merge tokens + conditionals are rendered/validated in TS and sent to backend via ProjectService.
+======================================================================== -->
+
 <div class="mailmerge-shell" [class.mm-sidebar-collapsed]="sidebarCollapsed">
-  <!-- LEFT SIDEBAR (1/6) -->
+  <!-- =========================================================================
+    LEFT SIDEBAR (navigation)
+    - Sidebar collapse toggle
+    - Create new project
+    - Search
+    - Project lists grouped by status (Drafts / Failed / Sent)
+  ========================================================================= -->
   <aside class="mm-sidebar" role="navigation" aria-label="Mailmerges">
+    <!-- Sidebar collapse/expand -->
     <button
       type="button"
       class="mm-sidebar-toggle"
@@ -10,9 +28,11 @@
       aria-label="Toggle mailmerges sidebar"
       title="Toggle sidebar"
     >
+      <!-- Uses a simple chevron-style text icon -->
       <span class="mm-toggle-icon">{{ sidebarCollapsed ? '»' : '«' }}</span>
     </button>
 
+    <!-- Create project (opens create modal; see creatingProject flag in TS) -->
     <button type="button" class="mm-new-project" (click)="newProject()">
       <span class="mm-new-project-text">New MailMerge</span>
       <span class="mm-plus">+</span>
@@ -20,6 +40,7 @@
 
     <div class="mm-sidebar-title">MailMerges</div>
 
+    <!-- Sidebar search (bound to projectSearch in TS; used by filteredAllProjects getters) -->
     <div class="mm-project-search">
       <input
         type="text"
@@ -33,8 +54,12 @@
       />
     </div>
 
+    <!-- Projects list (projects loaded via ProjectService.findMy() in TS loadProjects()) -->
     <ng-container *ngIf="projects?.length; else noProjectsTpl">
-      <!-- Ungrouped (status is null/undefined) -->
+      <!-- ===============================================================
+        UNGROUPED (status null/undefined)
+        - Uses ungroupedProjects getter (filters by search + no status)
+      =============================================================== -->
       <div class="mm-projects-list" *ngIf="ungroupedProjects.length">
         <button
           type="button"
@@ -51,6 +76,9 @@
             </div>
           </div>
 
+          <!-- NOTE: This is a <button> inside a <button> (invalid HTML).
+               It may still work, but if you ever see weird click behaviour,
+               swap outer container to a <div role="button"> or move delete outside. -->
           <button
             type="button"
             class="mm-project-delete"
@@ -63,12 +91,16 @@
         </button>
       </div>
 
+      <!-- Divider only if ungrouped exists + any folder group exists -->
       <div
         class="mm-folder-divider"
         *ngIf="ungroupedProjects.length && (pendingProjects.length || failedProjects.length || sentProjects.length)"
       ></div>
 
-      <!-- Folder: PENDING -->
+      <!-- ===============================================================
+        Folder: PENDING (Drafts)
+        - toggleFolder('PENDING') flips folderOpen.PENDING in TS
+      =============================================================== -->
       <button type="button" class="mm-folder" (click)="toggleFolder('PENDING')">
         <span class="mm-folder-caret">{{ folderOpen.PENDING ? '▾' : '▸' }}</span>
         <span class="mm-folder-name">Drafts</span>
@@ -103,7 +135,9 @@
         </button>
       </div>
 
-      <!-- Folder: FAILED -->
+      <!-- ===============================================================
+        Folder: FAILED
+      =============================================================== -->
       <button type="button" class="mm-folder" (click)="toggleFolder('FAILED')">
         <span class="mm-folder-caret">{{ folderOpen.FAILED ? '▾' : '▸' }}</span>
         <span class="mm-folder-name">Failed</span>
@@ -138,7 +172,9 @@
         </button>
       </div>
 
-      <!-- Folder: SENT -->
+      <!-- ===============================================================
+        Folder: SENT
+      =============================================================== -->
       <button type="button" class="mm-folder" (click)="toggleFolder('SENT')">
         <span class="mm-folder-caret">{{ folderOpen.SENT ? '▾' : '▸' }}</span>
         <span class="mm-folder-name">Sent</span>
@@ -173,7 +209,7 @@
         </button>
       </div>
 
-      <!-- If search returns zero across everything -->
+      <!-- Search empty state (only when user has typed something) -->
       <div
         class="mm-empty"
         *ngIf="projectSearch && !ungroupedProjects.length && !pendingProjects.length && !failedProjects.length && !sentProjects.length"
@@ -182,16 +218,25 @@
       </div>
     </ng-container>
 
+    <!-- Sidebar empty state -->
     <ng-template #noProjectsTpl>
       <div class="mm-empty">No mailmerges found.</div>
     </ng-template>
   </aside>
 
-  <!-- RIGHT MAIN (5/6) -->
+  <!-- =========================================================================
+    RIGHT MAIN (compose area)
+    - Hidden inputs for file pickers
+    - Spreadsheet connect + preview
+    - Send/Save dropdown + progress bar (SSE)
+    - Compose fields (To/Cc/Bcc/Subject/Body)
+    - Bottom panels (AI + Preview)
+    - Alternative right-side panels (howto/sheet/ai/preview/signature)
+  ========================================================================= -->
   <main class="mm-main" role="main">
-    <!-- ✅ Blank RHS until a project is selected/created -->
+    <!-- If no project selected, show friendly blank state -->
     <ng-container *ngIf="hasSelectedProject; else noProjectSelectedTpl">
-      <!-- hidden inputs triggered from toolbar -->
+      <!-- Hidden file inputs triggered via TS (.click()) -->
       <input
         #mergeFileInput
         type="file"
@@ -203,10 +248,12 @@
 
       <input #attachmentsInput type="file" class="d-none" multiple (change)="onAttachmentsChange($event)" />
 
-      <!-- A) TOP TOOLBAR — Spreadsheet ONLY -->
+      <!-- ===============================================================
+        A) TOP TOOLBAR — Spreadsheet connect + connected pill + inline preview
+      =============================================================== -->
       <div class="mm-toolbar mm-toolbar--sheetonly">
         <div class="mm-toolbar-seg mm-toolbar-sheet">
-          <!-- ✅ Dropdown like Send/Save -->
+          <!-- If no spreadsheet connected: show dropdown to choose Local / OneDrive -->
           <div class="mm-dropdown mm-sheet-dropdown" *ngIf="!hasConnectedSpreadsheet; else connectedSpreadsheetTpl">
             <button type="button" class="mm-btn mm-btn-excel" (click)="toggleSpreadsheetMenu()">
               Connect Spreadsheet
@@ -214,6 +261,7 @@
             </button>
 
             <div class="mm-menu" *ngIf="spreadsheetMenuOpen">
+              <!-- chooseSpreadsheet() closes menu + sets source + triggers picker -->
               <button
                 type="button"
                 class="mm-menu-item"
@@ -234,10 +282,10 @@
             </div>
           </div>
 
-          <!-- ✅ Connected spreadsheet pill with expand preview -->
+          <!-- Connected spreadsheet UI -->
           <ng-template #connectedSpreadsheetTpl>
             <div class="mm-sheet-connected">
-              <!-- BIG triangle toggle (left) -->
+              <!-- Expand/collapse the inline spreadsheet preview (spreadsheetPreviewOpen boolean in TS) -->
               <button
                 type="button"
                 class="mm-sheet-caret-btn"
@@ -248,31 +296,33 @@
                 {{ spreadsheetPreviewOpen ? '▾' : '▸' }}
               </button>
 
-              <!-- Icon + name -->
-
+              <!-- Download link: downloadSpreadsheet() builds Blob from base64 and downloads with original name -->
               <a class="mm-sheet-name" href="#" (click)="downloadSpreadsheet($event)">
                 {{ connectedSpreadsheetName }}
               </a>
 
+              <!-- Shows if spreadsheet came from OneDrive (oneDriveSpreadsheetName set in TS) -->
               <span *ngIf="oneDriveSpreadsheetName" class="mm-badge">OneDrive</span>
 
+              <!-- Remove spreadsheet clears parsed headers/rows + base64 (removeSpreadsheet() in TS) -->
               <button type="button" class="mm-icon-btn" title="Remove spreadsheet" (click)="removeSpreadsheet()">
                 <fa-icon [icon]="faTrash"></fa-icon>
               </button>
             </div>
 
-            <!-- ✅ Inline expanded preview (click triangle again to close) -->
+            <!-- Inline spreadsheet table preview (spreadsheetTable built in TS from XLSX parse) -->
             <div class="mm-sheet-preview" *ngIf="spreadsheetPreviewOpen && spreadsheetTable?.length">
               <div class="mm-sheet-scroll">
                 <table class="table table-bordered table-sm mb-0 mm-sheet-table">
                   <thead>
                   <tr>
+                    <!-- spreadsheetTable[0] is the header row -->
                     <th *ngFor="let h of spreadsheetTable[0]">{{ h }}</th>
                   </tr>
                   </thead>
 
                   <tbody>
-                  <!-- show ALL data rows (everything after the header row) -->
+                  <!-- spreadsheetTable.slice(1) are data rows; trackByRowIndex is a simple index trackBy in TS -->
                   <tr *ngFor="let row of spreadsheetTable.slice(1); trackBy: trackByRowIndex">
                     <td *ngFor="let cell of row">{{ cell }}</td>
                   </tr>
@@ -284,14 +334,14 @@
         </div>
       </div>
 
-      <!-- Optional: OneDrive error row ONLY -->
+      <!-- OneDrive error area (set in TS when picker/download fails) -->
       <div class="mm-subrow">
         <div class="mm-subrow-left">
           <div *ngIf="oneDriveError" class="mm-error">{{ oneDriveError }}</div>
         </div>
       </div>
 
-      <!-- Global toast (validation + success/error messages) -->
+      <!-- Global toast messages (validation, success, errors) controlled by uiToast in TS -->
       <div
         *ngIf="uiToast"
         class="mm-toast"
@@ -304,7 +354,10 @@
         {{ uiToast.text }}
       </div>
 
-      <!-- OneDrive picker -->
+      <!-- ===============================================================
+        OneDrive picker UI (only shown if oneDrivePickerVisible is true)
+        - Populated via OneDriveService / OneDrivePickerV8Service in TS
+      =============================================================== -->
       <div *ngIf="oneDrivePickerVisible" class="mm-onedrive-picker">
         <div class="mm-onedrive-header">
           <strong>Select a spreadsheet from your OneDrive</strong>
@@ -319,6 +372,8 @@
               <fa-icon [icon]="faFileExcel" class="text-success me-2"></fa-icon>
               <span>{{ f.name }}</span>
             </div>
+
+            <!-- selectOneDriveFile() downloads the bytes and loads via loadSpreadsheetFile() -->
             <button type="button" class="mm-btn" (click)="selectOneDriveFile(f)">Use this</button>
           </li>
         </ul>
@@ -328,7 +383,11 @@
         </div>
       </div>
 
-      <!-- B) MERGE FIELDS ROW (conditional) -->
+      <!-- ===============================================================
+        B) MERGE FIELDS ROW
+        - Shows header “chips” when spreadsheetHeaders exist
+        - Dragging inserts {{Header}} into To/Cc/Bcc/Subject/Body via onDrop()
+      =============================================================== -->
       <div *ngIf="spreadsheetHeaders?.length" class="mm-merge-fields-row">
         <div class="mm-merge-fields-scroll">
           <span
@@ -343,7 +402,11 @@
         </div>
       </div>
 
-      <!-- C) SEND/SAVE + PROGRESS ROW -->
+      <!-- ===============================================================
+        C) SEND/SAVE + PROGRESS ROW
+        - Dropdown calls saveProject(), testProject(), queueSendProject()
+        - Progress bar updates via SSE stream in TS listenToMailProgress()
+      =============================================================== -->
       <div class="mm-action-row">
         <div class="mm-action-left">
           <div class="mm-dropdown">
@@ -358,7 +421,14 @@
             </button>
 
             <div class="mm-menu" *ngIf="sendMenuOpen">
-              <button type="button" class="mm-menu-item" (click)="saveProject(); sendMenuOpen=false" [disabled]="saving">Save</button>
+              <button
+                type="button"
+                class="mm-menu-item"
+                (click)="saveProject(); sendMenuOpen=false"
+                [disabled]="saving"
+              >
+                Save
+              </button>
 
               <button
                 type="button"
@@ -380,11 +450,13 @@
             </div>
           </div>
 
+          <!-- Inline status feedback driven by TS flags -->
           <div class="mm-status-inline">
             <span *ngIf="sendQueued()" class="mm-warn">
               ⏳ Sending in {{ sendQueuedSeconds() }}s
               <button type="button" class="mm-link" (click)="undoQueuedSend()">Undo</button>
             </span>
+
             <span *ngIf="saveSuccess" class="mm-ok">✅ Saved</span>
             <span *ngIf="testSuccess" class="mm-ok">✅ Test sent</span>
             <span *ngIf="sendSuccess" class="mm-ok">✅ Sent</span>
@@ -394,6 +466,7 @@
           </div>
         </div>
 
+        <!-- Progress bar is visible during sending + briefly after completion -->
         <div class="mm-action-right" *ngIf="sendingInProgress || sendingFinished">
           <div class="progress mm-progress">
             <div
@@ -410,15 +483,19 @@
                 <ng-template #startingTpl>Sending…</ng-template>
               </ng-container>
 
-              <ng-template #finishedTpl>
-                ✅ {{ sendingTotal }} / {{ sendingTotal }}
-              </ng-template>
+              <ng-template #finishedTpl> ✅ {{ sendingTotal }} / {{ sendingTotal }} </ng-template>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ✅ D) COMPOSE -->
+      <!-- ===============================================================
+        D) COMPOSE FORM (only when activePanel === 'compose')
+        - contenteditable editors write back into TS via onEditorInput(field)
+        - drag/drop inserts tokens via onDrop()
+        - formatting toolbar calls formatFromToolbar()
+        - paste handler supports inline images (onEditorPaste)
+      =============================================================== -->
       <form *ngIf="activePanel === 'compose'" #mergeForm="ngForm" novalidate class="mm-form">
         <div class="mm-compose">
           <!-- TO -->
@@ -434,6 +511,7 @@
               (input)="onEditorInput('to')"
             ></div>
 
+            <!-- Toggles showing the Bcc row; TS also focuses bccField when opened -->
             <button type="button" class="mm-link-btn" (click)="toggleBcc()">
               {{ showBcc ? 'Hide Bcc' : 'Bcc' }}
             </button>
@@ -453,7 +531,7 @@
             ></div>
           </div>
 
-          <!-- BCC -->
+          <!-- BCC (conditional render) -->
           <div class="mm-compose-row" *ngIf="showBcc">
             <div class="mm-compose-label">Bcc</div>
 
@@ -482,39 +560,53 @@
             ></div>
           </div>
 
-          <!-- ✅ Formatting bar between subject and body -->
+          <!-- Formatting bar (between subject and body) -->
           <div class="mm-format-bar" role="toolbar" aria-label="Formatting">
-            <button type="button" class="mm-icon-btn" title="Bold" (mousedown)="formatFromToolbar($event, 'bold')"><b>B</b></button>
-            <button type="button" class="mm-icon-btn" title="Italic" (mousedown)="formatFromToolbar($event, 'italic')"><i>I</i></button>
-            <button type="button" class="mm-icon-btn" title="Underline" (mousedown)="formatFromToolbar($event, 'underline')"><u>U</u></button>
+            <!-- Uses (mousedown) so toolbar click doesn’t steal the selection before formatting is applied -->
+            <button type="button" class="mm-icon-btn" title="Bold" (mousedown)="formatFromToolbar($event, 'bold')">
+              <b>B</b>
+            </button>
+            <button type="button" class="mm-icon-btn" title="Italic" (mousedown)="formatFromToolbar($event, 'italic')">
+              <i>I</i>
+            </button>
+            <button
+              type="button"
+              class="mm-icon-btn"
+              title="Underline"
+              (mousedown)="formatFromToolbar($event, 'underline')"
+            >
+              <u>U</u>
+            </button>
+
+            <!-- Conditionals: draggable snippets that insert syntax into editor -->
             <div class="mm-merge-section">
               <div class="mm-merge-section-title">Conditionals</div>
 
-              <div class="mm-draggable"
-                   draggable="true"
-                   (dragstart)="onConditionSnippetDragStart($event, 'if')">
+              <div class="mm-draggable" draggable="true" (dragstart)="onConditionSnippetDragStart($event, 'if')">
                 [[if]] block
               </div>
 
-              <div class="mm-draggable"
-                   draggable="true"
-                   (dragstart)="onConditionSnippetDragStart($event, 'nestedIf')">
+              <div class="mm-draggable" draggable="true" (dragstart)="onConditionSnippetDragStart($event, 'nestedIf')">
                 Nested [[if]]
               </div>
 
-              <div class="mm-draggable"
-                   draggable="true"
-                   (dragstart)="onConditionSnippetDragStart($event, 'thunderbird')">
+              <div
+                class="mm-draggable"
+                draggable="true"
+                (dragstart)="onConditionSnippetDragStart($event, 'thunderbird')"
+              >
                 Thunderbird one-liner
               </div>
             </div>
 
             <span class="mm-format-divider" aria-hidden="true"></span>
 
+            <!-- HTTPS link modal: insertHttpsLink() opens modal and stores selection range -->
             <button type="button" class="mm-icon-btn" title="Insert HTTPS link" (mousedown)="insertHttpsLink($event)">
               <fa-icon [icon]="faLink"></fa-icon>
             </button>
 
+            <!-- Attachments picker: triggers hidden #attachmentsInput click in TS -->
             <button type="button" class="mm-icon-btn" title="Attachments" (click)="openAttachmentsPicker()">
               <fa-icon [icon]="faPaperclip"></fa-icon>
             </button>
@@ -537,23 +629,30 @@
           </div>
         </div>
 
-        <!-- Attachments list -->
+        <!-- Attachments list (rendered from attachments[] in TS) -->
         <div class="mm-attachments" *ngIf="attachments.length">
           <div class="mm-attachments-title">Attachments</div>
           <ul class="list-unstyled mb-0">
             <li *ngFor="let a of attachments; let i = index" class="mm-attachment-item">
-              <a href="#" (click)="downloadAttachment(a, $event)">{{ a.name }} ({{ (a.size / 1024).toFixed(1) }} KB)</a>
+              <!-- downloadAttachment() builds Blob from base64 -->
+              <a href="#" (click)="downloadAttachment(a, $event)">
+                {{ a.name }} ({{ (a.size / 1024).toFixed(1) }} KB)
+              </a>
+              <!-- removeAttachment() tracks deleted IDs for DB cleanup in saveProject() -->
               <button type="button" class="mm-link-danger" (click)="removeAttachment(i)">Remove</button>
             </li>
           </ul>
         </div>
       </form>
 
-      <!-- ✅ Bottom split: Preview (left) + AI (right) — spreadsheet-style boxes -->
-      <!-- ✅ Bottom stacked: AI (top) + Preview (bottom) — full-width bars -->
+      <!-- ===============================================================
+        Bottom panels (only shown when composing):
+        - AI (rewrites body via AiRewriteService in TS)
+        - Preview (shows per-row rendered output; previewMerge() in TS)
+      =============================================================== -->
       <div class="mm-bottom-split" *ngIf="activePanel === 'compose'">
         <div class="mm-bottom-split-grid">
-          <!-- AI (top) -->
+          <!-- AI panel -->
           <div class="mm-collapsible">
             <button
               type="button"
@@ -561,23 +660,29 @@
               (click)="toggleBottomPanel('ai')"
               [attr.aria-expanded]="bottomAiOpen"
             >
-        <span class="mm-bottom-panel-title">
-          <span class="mm-sheet-caret-btn" aria-hidden="true">
-            {{ bottomAiOpen ? '▾' : '▸' }}
-          </span>
-          <span>AI Improvement</span>
-        </span>
+              <span class="mm-bottom-panel-title">
+                <span class="mm-sheet-caret-btn" aria-hidden="true">{{ bottomAiOpen ? '▾' : '▸' }}</span>
+                <span>AI Improvement</span>
+              </span>
             </button>
 
             <div class="mm-collapsible-body" *ngIf="bottomAiOpen">
               <h4 class="mb-3">Select Your Tone</h4>
 
               <div class="d-flex gap-3 mb-3 flex-wrap mm-ai-actions">
-                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('professional')" [disabled]="isRewriting || !mergeBodyTemplate">
+                <button
+                  class="mm-btn mm-btn-primary"
+                  (click)="rewriteEmailBody('professional')"
+                  [disabled]="isRewriting || !mergeBodyTemplate"
+                >
                   ✨ Professional
                 </button>
 
-                <button class="mm-btn mm-btn-primary" (click)="rewriteEmailBody('friendly')" [disabled]="isRewriting || !mergeBodyTemplate">
+                <button
+                  class="mm-btn mm-btn-primary"
+                  (click)="rewriteEmailBody('friendly')"
+                  [disabled]="isRewriting || !mergeBodyTemplate"
+                >
                   🙂 Friendly
                 </button>
 
@@ -599,6 +704,7 @@
                 style="max-width: 420px;"
               />
 
+              <!-- Preview is sanitized HTML created in TS (aiRewrittenPreview) -->
               <div *ngIf="aiRewrittenText && !isRewriting" class="mm-ai-preview">
                 <h5>Suggested Rewrite</h5>
                 <div class="mm-ai-preview-content" [innerHTML]="aiRewrittenPreview"></div>
@@ -609,7 +715,7 @@
             </div>
           </div>
 
-          <!-- PREVIEW (bottom) -->
+          <!-- Preview panel -->
           <div class="mm-collapsible">
             <button
               type="button"
@@ -617,13 +723,11 @@
               (click)="toggleBottomPanel('preview')"
               [attr.aria-expanded]="bottomPreviewOpen"
             >
-        <span class="mm-bottom-panel-title">
-          <span class="mm-sheet-caret-btn" aria-hidden="true">
-            {{ bottomPreviewOpen ? '▾' : '▸' }}
-          </span>
-          <span>Preview</span>
-          <span class="mm-folder-count" *ngIf="previewEmails?.length">{{ previewEmails.length }}</span>
-        </span>
+              <span class="mm-bottom-panel-title">
+                <span class="mm-sheet-caret-btn" aria-hidden="true">{{ bottomPreviewOpen ? '▾' : '▸' }}</span>
+                <span>Preview</span>
+                <span class="mm-folder-count" *ngIf="previewEmails?.length">{{ previewEmails.length }}</span>
+              </span>
             </button>
 
             <div class="mm-collapsible-body" *ngIf="bottomPreviewOpen">
@@ -637,6 +741,7 @@
                     <span class="mm-email-date">Now</span>
                   </div>
 
+                  <!-- email.body is SafeHtml prepared in TS using DomSanitizer -->
                   <div class="mm-email-body mt-2">
                     <div [innerHTML]="email.body"></div>
                   </div>
@@ -659,7 +764,11 @@
           </div>
         </div>
       </div>
-      <!-- ✅ Right-side panels (only one at a time) -->
+
+      <!-- ===============================================================
+        Right-side panels (non-compose modes)
+        - Controlled by activePanel (RightPanel union in TS)
+      =============================================================== -->
       <section class="mm-panels" *ngIf="activePanel !== 'compose'">
         <!-- HOW TO -->
         <div *ngIf="activePanel === 'howto'" class="mm-panel">
@@ -672,7 +781,7 @@
           </p>
         </div>
 
-        <!-- SHEET -->
+        <!-- SHEET (separate panel view; you also have an inline sheet preview above) -->
         <div *ngIf="activePanel === 'sheet' && spreadsheetTable && spreadsheetTable.length" class="mm-panel">
           <h4>Spreadsheet Preview</h4>
           <table class="table table-bordered table-sm mt-2">
@@ -689,7 +798,7 @@
           </table>
         </div>
 
-        <!-- AI -->
+        <!-- AI (separate panel view; you also have a bottom AI panel during compose) -->
         <div *ngIf="activePanel === 'ai'" class="mm-panel">
           <h4 class="mb-3">Select Your Tone</h4>
 
@@ -723,7 +832,7 @@
           </div>
         </div>
 
-        <!-- PREVIEW -->
+        <!-- PREVIEW (separate panel view; you also have a bottom Preview panel during compose) -->
         <div *ngIf="activePanel === 'preview' && previewEmails.length > 0" class="mm-panel">
           <h4 class="mb-3">Email Preview ({{ previewEmails.length }})</h4>
           <div class="mm-preview-list">
@@ -757,6 +866,9 @@
           <h4 class="mb-2">Signature</h4>
           <div class="mm-muted mb-2">Paste or type your signature below</div>
 
+          <!-- Signature editor:
+               - contenteditable is saved via onSignatureInput() -> signatureDraftHtml (TS)
+               - saveSignature() persists via SignatureService.update() (TS) -->
           <div
             id="signatureEditor"
             class="mm-body-editor"
@@ -767,14 +879,12 @@
           ></div>
 
           <div class="d-flex gap-2 mt-2 flex-wrap">
-            <button type="button" class="mm-btn mm-btn-primary" (click)="saveSignature()">
-              Save
-            </button>
+            <button type="button" class="mm-btn mm-btn-primary" (click)="saveSignature()">Save</button>
             <button type="button" class="mm-link" (click)="setPanel('compose')">Cancel</button>
           </div>
         </div>
 
-        <!-- empty states -->
+        <!-- Empty states for right-side panels -->
         <div *ngIf="activePanel === 'preview' && previewEmails.length === 0" class="mm-panel">
           <h4 class="mb-2">Email Preview</h4>
           <div class="mm-muted">No preview available yet. Connect a spreadsheet first.</div>
@@ -787,8 +897,11 @@
       </section>
     </ng-container>
 
+    <!-- =========================================================================
+      No project selected state
+      - Appears when /mail has no :id route param (see route.params subscription in TS)
+    ========================================================================= -->
     <ng-template #noProjectSelectedTpl>
-      <!-- “Blank” RHS state (you can style this to be fully empty if you prefer) -->
       <div class="mm-panel" style="height: 100%; display: flex; align-items: center; justify-content: center;">
         <div style="text-align: center; max-width: 520px;">
           <h4 style="margin-bottom: 8px;">Select or create a mailmerge</h4>
@@ -799,6 +912,11 @@
   </main>
 </div>
 
+<!-- =========================================================================
+  Create project modal
+  - Visible when creatingProject === true (set by newProject() in TS)
+  - confirmCreateProject() calls ProjectService.create() and navigates to new project
+======================================================================== -->
 <div class="mm-modal-backdrop" *ngIf="creatingProject">
   <div class="mm-modal" role="dialog" aria-modal="true">
     <h3>Create new mailmerge</h3>
@@ -814,18 +932,18 @@
 
     <div class="mm-modal-actions">
       <button class="mm-btn" (click)="creatingProject = false">Cancel</button>
-      <button
-        class="mm-btn mm-btn-primary"
-        [disabled]="!newProjectName.trim()"
-        (click)="confirmCreateProject()"
-      >
+      <button class="mm-btn mm-btn-primary" [disabled]="!newProjectName.trim()" (click)="confirmCreateProject()">
         Create
       </button>
     </div>
   </div>
 </div>
 
-<!-- Hyperlink modal -->
+<!-- =========================================================================
+  Hyperlink modal (HTTPS-only)
+  - Opened via insertHttpsLink() in TS, which saves the selection range
+  - confirmInsertLink() inserts <a href="https://..."> into the body editor
+======================================================================== -->
 <div *ngIf="linkModalOpen" class="mm-modal-backdrop" (click)="closeLinkModal()">
   <div
     class="mm-modal"
@@ -864,7 +982,11 @@
   </div>
 </div>
 
-<!-- Delete project confirmation modal -->
+<!-- =========================================================================
+  Delete project confirmation modal
+  - Opened via openDeleteProjectModal(p, $event) in TS
+  - confirmDeleteProject() calls ProjectService.delete(id) in TS
+======================================================================== -->
 <div class="mm-modal-backdrop" *ngIf="deleteConfirmOpen" (click)="cancelDeleteProject()">
   <div
     class="mm-modal"
@@ -888,9 +1010,7 @@
 
     <div class="mm-modal-footer">
       <button type="button" class="mm-btn" (click)="cancelDeleteProject()">Cancel</button>
-      <button type="button" class="mm-btn mm-btn-danger" (click)="confirmDeleteProject()">
-        Delete
-      </button>
+      <button type="button" class="mm-btn mm-btn-danger" (click)="confirmDeleteProject()">Delete</button>
     </div>
   </div>
 </div>
