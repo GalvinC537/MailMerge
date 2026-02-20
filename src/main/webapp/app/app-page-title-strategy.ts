@@ -3,11 +3,7 @@ import { RouterStateSnapshot, TitleStrategy } from '@angular/router';
 
 @Injectable()
 export class AppPageTitleStrategy extends TitleStrategy {
-  override updateTitle(routerState: RouterStateSnapshot): void {
-    let pageTitle = this.buildTitle(routerState);
-    if (!pageTitle) {
-      pageTitle = 'Mailmerge';
-    }
-    document.title = pageTitle;
+  override updateTitle(_routerState: RouterStateSnapshot): void {
+    document.title = 'MailMerge';
   }
 }

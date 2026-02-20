@@ -94,7 +94,7 @@
       <!-- Divider only if ungrouped exists + any folder group exists -->
       <div
         class="mm-folder-divider"
-        *ngIf="ungroupedProjects.length && (pendingProjects.length || failedProjects.length || sentProjects.length)"
+        *ngIf="ungroupedProjects.length && (pendingProjects.length || sentProjects.length)"
       ></div>
 
       <!-- ===============================================================
@@ -112,43 +112,6 @@
           type="button"
           class="mm-project-item"
           *ngFor="let p of pendingProjects; trackBy: trackByProjectId"
-          [class.active]="p.id === projectId"
-          (click)="openProjectFromSidebar(p)"
-          [attr.title]="p.name || 'Untitled Mailmerge'"
-        >
-          <div class="mm-project-main">
-            <div class="mm-project-name">{{ p.name || 'Untitled Mailmerge' }}</div>
-            <div class="mm-project-meta">
-              <span class="mm-status">{{ p.status }}</span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            class="mm-project-delete"
-            title="Delete"
-            aria-label="Delete mailmerge"
-            (click)="openDeleteProjectModal(p, $event)"
-          >
-            <fa-icon [icon]="faTrash"></fa-icon>
-          </button>
-        </button>
-      </div>
-
-      <!-- ===============================================================
-        Folder: FAILED
-      =============================================================== -->
-      <button type="button" class="mm-folder" (click)="toggleFolder('FAILED')">
-        <span class="mm-folder-caret">{{ folderOpen.FAILED ? '▾' : '▸' }}</span>
-        <span class="mm-folder-name">Failed</span>
-        <span class="mm-folder-count">{{ failedProjects.length }}</span>
-      </button>
-
-      <div class="mm-projects-list" *ngIf="folderOpen.FAILED && failedProjects.length">
-        <button
-          type="button"
-          class="mm-project-item"
-          *ngFor="let p of failedProjects; trackBy: trackByProjectId"
           [class.active]="p.id === projectId"
           (click)="openProjectFromSidebar(p)"
           [attr.title]="p.name || 'Untitled Mailmerge'"
@@ -212,7 +175,7 @@
       <!-- Search empty state (only when user has typed something) -->
       <div
         class="mm-empty"
-        *ngIf="projectSearch && !ungroupedProjects.length && !pendingProjects.length && !failedProjects.length && !sentProjects.length"
+        *ngIf="projectSearch && !ungroupedProjects.length && !pendingProjects.length && !sentProjects.length"
       >
         No matching mailmerges.
       </div>
@@ -402,6 +365,79 @@
         </div>
       </div>
 
+      <div class="mm-collapsible mm-cond-builder">
+        <button
+          type="button"
+          class="mm-collapsible-header mm-cond-header"
+          (click)="toggleConditionals()"
+          [attr.aria-expanded]="conditionalsOpen"
+        >
+    <span class="mm-bottom-panel-title">
+      <span class="mm-sheet-caret-btn" aria-hidden="true">{{ conditionalsOpen ? '▾' : '▸' }}</span>
+      <span>Conditionals</span>
+    </span>
+        </button>
+
+        <div class="mm-collapsible-body mm-cond-body" *ngIf="conditionalsOpen">
+          <div class="mm-cond-grid">
+            <!-- LEFT: controls -->
+            <div class="mm-cond-controls">
+              <!-- Row: conditional type -->
+              <div class="mm-cond-row">
+                <div class="mm-cond-label">Type</div>
+
+                <select
+                  class="form-select mm-cond-select"
+                  [(ngModel)]="selectedConditionalType"
+                  name="selectedConditionalType"
+                >
+                  <option [ngValue]="null">Select conditional…</option>
+                  <option [ngValue]="'if'">[[if]] block</option>
+                  <option [ngValue]="'nestedIf'">Nested [[if]] block</option>
+                  <option [ngValue]="'thunderbird'">Thunderbird one-liner</option>
+                </select>
+              </div>
+
+              <!-- Row: merge field -->
+              <div class="mm-cond-row">
+                <div class="mm-cond-label">Field</div>
+
+                <select
+                  class="form-select mm-cond-select"
+                  [(ngModel)]="selectedConditionalField"
+                  name="selectedConditionalField"
+                  [disabled]="!spreadsheetHeaders?.length"
+                >
+                  <option [ngValue]="null">
+                    {{ spreadsheetHeaders?.length ? 'Select merge field…' : 'Connect a spreadsheet to enable fields…' }}
+                  </option>
+
+                  <option *ngFor="let h of spreadsheetHeaders" [ngValue]="h">{{ h }}</option>
+                </select>
+              </div>
+
+              <div class="mm-muted" *ngIf="!canBuildConditional">
+                Select a conditional type and a field (and connect a spreadsheet if needed) to enable drag & drop.
+              </div>
+            </div>
+
+            <!-- RIGHT: draggable snippet -->
+            <div class="mm-cond-snippet-wrap">
+              <div class="mm-cond-snippet-title">Drag & drop</div>
+
+              <div
+                class="mm-draggable mm-cond-snippet"
+                [class.mm-disabled]="!canBuildConditional"
+                [attr.draggable]="canBuildConditional ? 'true' : 'false'"
+                (dragstart)="onConditionalBuilderDragStart($event)"
+                [innerHTML]="conditionalSnippetPreviewHtml"
+                title="Drag into To/Subject/Body etc."
+              ></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- ===============================================================
         C) SEND/SAVE + PROGRESS ROW
         - Dropdown calls saveProject(), testProject(), queueSendProject()
@@ -436,7 +472,7 @@
                 (click)="testProject(); sendMenuOpen=false"
                 [disabled]="testSending() || mergeSending() || saving"
               >
-                Test (send email to self)
+                Sample
               </button>
 
               <button
@@ -511,39 +547,42 @@
               (input)="onEditorInput('to')"
             ></div>
 
-            <!-- Toggles showing the Bcc row; TS also focuses bccField when opened -->
-            <button type="button" class="mm-link-btn" (click)="toggleBcc()">
-              {{ showBcc ? 'Hide Bcc' : 'Bcc' }}
+            <!-- Toggle showing CC+BCC -->
+            <button type="button" class="mm-link-btn" (click)="toggleCcBcc()">
+              {{ showCcBcc ? 'Hide Cc/Bcc' : 'Cc/Bcc' }}
             </button>
           </div>
 
-          <!-- CC -->
-          <div class="mm-compose-row">
-            <div class="mm-compose-label">Cc</div>
+          <!-- CC + BCC (collapsible together) -->
+          <ng-container *ngIf="showCcBcc">
+            <!-- CC -->
+            <div class="mm-compose-row">
+              <div class="mm-compose-label">Cc</div>
 
-            <div
-              id="ccField"
-              class="mm-line-editor merge-editor"
-              contenteditable="true"
-              (drop)="onDrop($event, 'cc')"
-              (dragover)="allowDrop($event)"
-              (input)="onEditorInput('cc')"
-            ></div>
-          </div>
+              <div
+                id="ccField"
+                class="mm-line-editor merge-editor"
+                contenteditable="true"
+                (drop)="onDrop($event, 'cc')"
+                (dragover)="allowDrop($event)"
+                (input)="onEditorInput('cc')"
+              ></div>
+            </div>
 
-          <!-- BCC (conditional render) -->
-          <div class="mm-compose-row" *ngIf="showBcc">
-            <div class="mm-compose-label">Bcc</div>
+            <!-- BCC -->
+            <div class="mm-compose-row">
+              <div class="mm-compose-label">Bcc</div>
 
-            <div
-              id="bccField"
-              class="mm-line-editor merge-editor"
-              contenteditable="true"
-              (drop)="onDrop($event, 'bcc')"
-              (dragover)="allowDrop($event)"
-              (input)="onEditorInput('bcc')"
-            ></div>
-          </div>
+              <div
+                id="bccField"
+                class="mm-line-editor merge-editor"
+                contenteditable="true"
+                (drop)="onDrop($event, 'bcc')"
+                (dragover)="allowDrop($event)"
+                (input)="onEditorInput('bcc')"
+              ></div>
+            </div>
+          </ng-container>
 
           <!-- SUBJECT -->
           <div class="mm-compose-row">
@@ -577,27 +616,6 @@
             >
               <u>U</u>
             </button>
-
-            <!-- Conditionals: draggable snippets that insert syntax into editor -->
-            <div class="mm-merge-section">
-              <div class="mm-merge-section-title">Conditionals</div>
-
-              <div class="mm-draggable" draggable="true" (dragstart)="onConditionSnippetDragStart($event, 'if')">
-                [[if]] block
-              </div>
-
-              <div class="mm-draggable" draggable="true" (dragstart)="onConditionSnippetDragStart($event, 'nestedIf')">
-                Nested [[if]]
-              </div>
-
-              <div
-                class="mm-draggable"
-                draggable="true"
-                (dragstart)="onConditionSnippetDragStart($event, 'thunderbird')"
-              >
-                Thunderbird one-liner
-              </div>
-            </div>
 
             <span class="mm-format-divider" aria-hidden="true"></span>
 
@@ -910,33 +928,6 @@
       </div>
     </ng-template>
   </main>
-</div>
-
-<!-- =========================================================================
-  Create project modal
-  - Visible when creatingProject === true (set by newProject() in TS)
-  - confirmCreateProject() calls ProjectService.create() and navigates to new project
-======================================================================== -->
-<div class="mm-modal-backdrop" *ngIf="creatingProject">
-  <div class="mm-modal" role="dialog" aria-modal="true">
-    <h3>Create new mailmerge</h3>
-
-    <input
-      type="text"
-      class="mm-input"
-      placeholder="Mailmerge name"
-      [(ngModel)]="newProjectName"
-      (keydown.enter)="confirmCreateProject()"
-      autofocus
-    />
-
-    <div class="mm-modal-actions">
-      <button class="mm-btn" (click)="creatingProject = false">Cancel</button>
-      <button class="mm-btn mm-btn-primary" [disabled]="!newProjectName.trim()" (click)="confirmCreateProject()">
-        Create
-      </button>
-    </div>
-  </div>
 </div>
 
 <!-- =========================================================================
