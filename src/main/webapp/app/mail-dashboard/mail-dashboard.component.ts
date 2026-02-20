@@ -1,4 +1,4 @@
-import { Component, ElementRef, OnInit, ViewChild, inject, signal } from '@angular/core';
+import { Component, ElementRef, OnInit, OnDestroy, ViewChild, inject, signal } from '@angular/core';
 import { ActivatedRoute, Router, RouterModule } from '@angular/router';
 import { FormsModule } from '@angular/forms';
 import * as XLSX from 'xlsx';
@@ -12,7 +12,7 @@ import { DomSanitizer, SafeHtml } from '@angular/platform-browser';
 import { OneDriveService, OneDriveFileDto } from 'app/services/one-drive.service';
 import { OneDrivePickerV8Service } from 'app/services/one-drive-picker-v8.service';
 import { AttachmentService } from 'app/project/attachment.service';
-import { forkJoin, of, switchMap, tap, catchError, finalize } from 'rxjs';
+import { forkJoin, of, switchMap, tap, catchError, finalize, Subject, takeUntil, filter, exhaustMap, debounceTime } from 'rxjs';
 import { AiRewriteService } from '../services/ai-rewrite.service';
 import { SignatureService } from 'app/core/auth/signature.service';
 import {
@@ -59,7 +59,7 @@ type InlineImage = { cid: string; fileContentType: string; base64: string; name:
   styleUrls: ['./mail-dashboard.component.scss'],
   imports: [SharedModule, RouterModule, FormsModule],
 })
-export class MailDashboardComponent implements OnInit {
+export class MailDashboardComponent implements OnInit, OnDestroy {
   // ===========================================================================
   // Dependency injection
   // ===========================================================================
@@ -83,6 +83,7 @@ export class MailDashboardComponent implements OnInit {
   private readonly oneDriveService = inject(OneDriveService);
   private readonly signatureService = inject(SignatureService);
   private readonly oneDrivePicker = inject(OneDrivePickerV8Service);
+  private readonly destroy$ = new Subject<void>();
 
   // ===========================================================================
   // Constants / internal flags
@@ -149,6 +150,9 @@ export class MailDashboardComponent implements OnInit {
   private sendQueuedTimeoutId: ReturnType<typeof setTimeout> | null = null;
   private sendQueuedIntervalId: ReturnType<typeof setInterval> | null = null;
 
+  private dirty = false;
+  private lastDirtyAt = 0;
+
   // ===========================================================================
   // View references (hidden file inputs)
   // ===========================================================================
@@ -175,17 +179,13 @@ export class MailDashboardComponent implements OnInit {
   projectSearch = '';
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
-  folderOpen: Record<'PENDING' | 'FAILED' | 'SENT', boolean> = {
+  folderOpen: Record<'PENDING' | 'SENT', boolean> = {
     PENDING: true,
-    FAILED: false,
     SENT: false,
   };
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   creatingProject = false;
-
-  // eslint-disable-next-line @typescript-eslint/member-ordering
-  newProjectName = '';
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   deleteConfirmOpen = false;
@@ -216,7 +216,7 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   projectName = '';
-
+  private readonly DEFAULT_PROJECT_NAME = 'Untitled MailMerge';
   // Templates stored as plain text / markdown-ish values:
   // - Subject/To/Cc/Bcc: stored as plain text (no HTML tags)
   // - Body: stored as markdown-ish (with your custom formatting rules)
@@ -237,7 +237,7 @@ export class MailDashboardComponent implements OnInit {
   bccField = '';
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
-  showBcc = false;
+  showCcBcc = false;
 
   /**
    * Merge spreadsheet (local or OneDrive):
@@ -506,6 +506,18 @@ export class MailDashboardComponent implements OnInit {
   faSignature = faSignature;
 
   // ===========================================================================
+  /** Conditional Builder UI (new) */
+  // ===========================================================================
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  conditionalsOpen = false;
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  selectedConditionalType: 'if' | 'nestedIf' | 'thunderbird' | null = null;
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  selectedConditionalField: string | null = null;
+
+  // ===========================================================================
   // Toast / small UX
   // ===========================================================================
 
@@ -524,25 +536,48 @@ export class MailDashboardComponent implements OnInit {
   // ===========================================================================
   // Angular lifecycle
   // ===========================================================================
-  ngOnInit(): void {
-    // Load the current authenticated account (JHipster auth)
-    this.accountService.identity().subscribe(account => this.account.set(account));
 
-    // Start listening to backend Server-Sent Events progress stream
-    // Backend endpoint: GET /api/mail-progress/stream
+  ngOnDestroy(): void {
+    this.destroy$.next();
+    this.destroy$.complete();
+
+    document.removeEventListener('keydown', this.onDocKeydown);
+    document.removeEventListener('mouseup', this.onDocMouseup);
+    document.removeEventListener('selectionchange', this.onDocSelectionChange);
+
+    if (this.mailProgressSource) {
+      try {
+        this.mailProgressSource.close();
+      } catch {
+        /* empty */
+      }
+      this.mailProgressSource = null;
+    }
+
+    this.clearQueuedSendTimers();
+
+    if (this.sendingFinishedTimeoutId) {
+      clearTimeout(this.sendingFinishedTimeoutId);
+      this.sendingFinishedTimeoutId = null;
+    }
+  }
+
+  ngOnInit(): void {
+    this.accountService
+      .identity()
+      .pipe(takeUntil(this.destroy$))
+      .subscribe(account => this.account.set(account));
+
     this.listenToMailProgress();
 
-    // Load project list in sidebar
     this.loadProjects();
 
-    // Restore sidebar collapsed state from localStorage
+    document.addEventListener('selectionchange', this.onDocSelectionChange);
+
     const saved = localStorage.getItem('mm_sidebar_collapsed');
     if (saved != null) this.sidebarCollapsed = saved === 'true';
 
-    // React to route param changes:
-    // - /mail/:id loads that project into the editor
-    // - /mail without id clears editor and shows blank panel
-    this.route.params.subscribe(params => {
+    this.route.params.pipe(takeUntil(this.destroy$)).subscribe(params => {
       const idParam = params['id'];
       if (idParam) {
         this.projectId = Number(idParam);
@@ -552,72 +587,10 @@ export class MailDashboardComponent implements OnInit {
       }
     });
 
-    // Global key handling:
-    // Backspace deletes a whole token chip in one go (prevents caret getting stuck inside token spans)
-    document.addEventListener('keydown', e => {
-      if (e.key !== 'Backspace') return;
+    document.addEventListener('keydown', this.onDocKeydown);
+    document.addEventListener('mouseup', this.onDocMouseup);
 
-      // Current selection/caret
-      const sel = window.getSelection();
-      if (!sel?.anchorNode) return;
-
-      const anchor = sel.anchorNode;
-
-      // Find the editor container this event is happening within
-      const container = anchor instanceof Element ? anchor.closest('.merge-editor') : anchor.parentElement?.closest('.merge-editor');
-      if (!container) return;
-
-      // If editor is visually empty, clear it hard (helps contenteditable behaviour)
-      const plain = (container as HTMLElement).innerText.trim();
-      if (plain === '') {
-        e.preventDefault();
-        (container as HTMLElement).innerHTML = '';
-        return;
-      }
-
-      // If caret is adjacent to/in a token, delete the token node rather than a single character
-      const token = anchor instanceof Element ? anchor.closest('.merge-token') : anchor.parentElement?.closest('.merge-token');
-      if (!token) return;
-
-      e.preventDefault();
-      token.remove();
-
-      // Determine which field was affected so we can sync DOM → TS model
-      const fieldContainer = token.closest('[id]');
-      if (!fieldContainer) return;
-
-      const id = (fieldContainer as HTMLElement).id;
-
-      let field: MergeField | null = null;
-      if (id === 'mergeBody') field = 'body';
-      else if (id === 'mergeSubject') field = 'subject';
-      else if (id === 'toField') field = 'to';
-      else if (id === 'ccField') field = 'cc';
-      else if (id === 'bccField') field = 'bcc';
-
-      // Re-sync model and re-render tokens so DOM stays consistent with templates
-      if (field) {
-        this.onEditorInput(field);
-        setTimeout(() => this.renderTokens(field));
-      }
-    });
-
-    // Prevent caret from being placed inside the token span itself
-    // (tokens are contenteditable=false, but some browsers can still behave oddly)
-    document.addEventListener('mouseup', () => {
-      const sel = window.getSelection();
-      if (!sel?.anchorNode) return;
-
-      const token = sel.anchorNode.parentElement?.closest('.merge-token');
-      if (token && sel.anchorNode === token.firstChild) {
-        const range = document.createRange();
-        range.setStartAfter(token);
-        range.collapse(true);
-
-        sel.removeAllRanges();
-        sel.addRange(range);
-      }
-    });
+    this.startDirtyAutosave();
   }
 
   // ===========================================================================
@@ -661,39 +634,24 @@ export class MailDashboardComponent implements OnInit {
   }
 
   newProject(): void {
-    // Opens create project UI (modal/inline)
-    this.newProjectName = '';
-    this.creatingProject = true;
-  }
+    // Prevent double-click spam
+    if (this.creatingProject) return;
 
-  confirmCreateProject(): void {
-    const name = (this.newProjectName || '').trim();
-    if (!name) return;
-
-    // This boolean currently represents “create UI open / busy”
-    // If later you want a separate spinner, split into two flags.
     this.creatingProject = true;
 
-    // JDL likely expects status enum; PENDING means it appears in Drafts immediately
     const newProject: any = {
-      name,
+      name: this.DEFAULT_PROJECT_NAME,
       status: 'PENDING',
     };
 
-    // Calls ProjectService.create() (backend: POST /api/projects)
     this.projectService.create(newProject).subscribe({
       next: (created: Project) => {
         this.creatingProject = false;
-        this.newProjectName = '';
-
-        // UI feedback
-        this.saveSuccess = true;
-        setTimeout(() => (this.saveSuccess = false), 2000);
 
         // Refresh sidebar list
         this.loadProjects();
 
-        // Navigate to the created project so editors can load it
+        // Navigate to the created project so the editor opens
         if (created.id) {
           this.openProjectFromSidebar(created);
         }
@@ -704,6 +662,26 @@ export class MailDashboardComponent implements OnInit {
         this.showToast('error', 'Failed to create project. Please try again.');
       },
     });
+  }
+
+  syncProjectTitleFromSubject(): void {
+    const subject = (this.mergeSubjectTemplate || '').trim();
+    const maxLen = 80;
+
+    if (subject) {
+      const nextName = subject.length > maxLen ? subject.slice(0, maxLen) : subject;
+      if (this.projectName !== nextName) {
+        this.projectName = nextName;
+        this.markDirty();
+      }
+      return;
+    }
+
+    // ✅ if subject is empty, always fall back to default
+    if (this.projectName !== this.DEFAULT_PROJECT_NAME) {
+      this.projectName = this.DEFAULT_PROJECT_NAME;
+      this.markDirty();
+    }
   }
 
   deleteCurrentProject(): void {
@@ -941,39 +919,107 @@ export class MailDashboardComponent implements OnInit {
 
     event.preventDefault();
 
-    // Retrieve token text from drag data
     const text = event.dataTransfer?.getData('text/plain') ?? '';
+    if (!text) return;
 
-    // Focus the editor and insert at caret
     const el = document.getElementById(this.getElementId(field));
     if (!el) return;
+
     el.focus();
 
     const sel = window.getSelection();
-    if (!sel?.rangeCount) return;
+    if (!sel || sel.rangeCount === 0) return;
 
     const range = sel.getRangeAt(0);
     range.deleteContents();
 
-    // Insert literal token text first; renderTokens later converts it into chip spans
-    range.insertNode(document.createTextNode(text));
+    // CASE 1: whole dropped text is a single token e.g. {{Name}}
+    const tokenMatch = text.match(/^{{\s*([^}]+)\s*}}$/);
+    const tokenKey = tokenMatch?.[1]?.trim() ?? '';
 
-    // Insert trailing space so user can keep typing
-    const space = document.createTextNode(' ');
-    range.insertNode(space);
+    if (tokenKey && this.isKnownMergeField(tokenKey)) {
+      const span = document.createElement('span');
+      span.className = 'merge-token';
+      span.setAttribute('data-field', tokenKey);
+      span.setAttribute('contenteditable', 'false');
+      span.setAttribute('style', `background:${this.getColorForField(tokenKey)}`);
+      span.textContent = tokenKey;
 
-    // Move caret after inserted space
-    range.setStartAfter(space);
-    range.collapse(true);
+      range.insertNode(span);
 
-    sel.removeAllRanges();
-    sel.addRange(range);
+      // trailing space only for single token drops
+      const space = document.createTextNode('\u00A0');
+      span.after(space);
 
-    // Sync DOM → templates
+      const newRange = document.createRange();
+      newRange.setStartAfter(space);
+      newRange.collapse(true);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    } else {
+      // CASE 2: snippets / conditionals / mixed text with embedded {{tokens}}
+      const frag = this.buildDroppedContentFragment(text, field === 'body');
+
+      range.insertNode(frag);
+
+      // Move caret to end of inserted content
+      const newRange = document.createRange();
+      newRange.selectNodeContents(el);
+      newRange.collapse(false);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+    }
+
+    // Sync model only (do NOT renderTokens here or caret jumps)
     this.onEditorInput(field);
+  }
 
-    // Convert any known tokens into chips
-    setTimeout(() => this.renderTokens(field));
+  private buildDroppedContentFragment(text: string, preserveNewLines: boolean): DocumentFragment {
+    const frag = document.createDocumentFragment();
+
+    // Split into token chunks and normal text chunks
+    const parts = text.split(/({{\s*[^}]+\s*}})/g);
+
+    parts.forEach(part => {
+      if (!part) return;
+
+      const m = part.match(/^{{\s*([^}]+)\s*}}$/);
+      if (m) {
+        // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+        const key = (m[1] ?? '').trim();
+
+        if (this.isKnownMergeField(key)) {
+          const span = document.createElement('span');
+          span.className = 'merge-token';
+          span.setAttribute('data-field', key);
+          span.setAttribute('contenteditable', 'false');
+          span.setAttribute('style', `background:${this.getColorForField(key)}`);
+          span.textContent = key;
+          frag.appendChild(span);
+          return;
+        }
+      }
+
+      // Normal text chunk
+      if (!preserveNewLines) {
+        // To/Cc/Bcc/Subject are single-line editors
+        frag.appendChild(document.createTextNode(part.replace(/\r?\n/g, ' ')));
+        return;
+      }
+
+      // Body editor: preserve newlines visually as <br>
+      const lines = part.split(/\r?\n/);
+      lines.forEach((line, idx) => {
+        if (line.length > 0) {
+          frag.appendChild(document.createTextNode(line));
+        }
+        if (idx < lines.length - 1) {
+          frag.appendChild(document.createElement('br'));
+        }
+      });
+    });
+
+    return frag;
   }
 
   // ===========================================================================
@@ -1049,6 +1095,12 @@ export class MailDashboardComponent implements OnInit {
     this.mergeFile = null;
     this.spreadsheetBase64 = null;
 
+    this.tokenColors = {};
+    this.tokenColorCursor = 0;
+
+    // Remove conditional opition
+    this.selectedConditionalField = null;
+
     // Reset name fields used by UI and persistence
     this.mergeFileName = null;
     this.oneDriveSpreadsheetName = null;
@@ -1061,7 +1113,7 @@ export class MailDashboardComponent implements OnInit {
     this.previewEmails = [];
 
     // Reset To/Cc/Bcc UI behaviour that is spreadsheet driven
-    this.showBcc = false;
+    this.showCcBcc = false;
 
     // Reset OneDrive picker UI
     this.oneDrivePickerVisible = false;
@@ -1077,6 +1129,7 @@ export class MailDashboardComponent implements OnInit {
     if (this.mergeFileInput?.nativeElement) {
       this.mergeFileInput.nativeElement.value = '';
     }
+    this.markDirty();
   }
 
   // ===========================================================================
@@ -1286,6 +1339,7 @@ export class MailDashboardComponent implements OnInit {
 
       // With new rows loaded, refresh preview immediately
       this.previewMerge();
+      this.markDirty();
     };
 
     reader.readAsArrayBuffer(file);
@@ -1353,6 +1407,7 @@ export class MailDashboardComponent implements OnInit {
 
     // Clear file input so selecting same file again triggers change event
     input.value = '';
+    this.markDirty();
   }
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
@@ -1366,6 +1421,8 @@ export class MailDashboardComponent implements OnInit {
     if (removed.id) {
       this.deletedAttachmentIds.push(removed.id);
     }
+
+    this.markDirty();
   }
 
   // ===========================================================================
@@ -1382,7 +1439,7 @@ export class MailDashboardComponent implements OnInit {
     this.toField = '';
     this.ccField = '';
     this.bccField = '';
-    this.showBcc = false;
+    this.showCcBcc = false;
 
     this.attachments = [];
     this.deletedAttachmentIds = [];
@@ -1392,6 +1449,9 @@ export class MailDashboardComponent implements OnInit {
 
     this.removeSpreadsheet();
     this.previewEmails = [];
+
+    this.tokenColors = {};
+    this.tokenColorCursor = 0;
 
     // Opening a project should land on compose by default
     this.activePanel = 'compose';
@@ -1424,7 +1484,7 @@ export class MailDashboardComponent implements OnInit {
         this.bccField = (p as any).bccField ?? '';
 
         // Bcc UI should only show if bcc contains something
-        this.showBcc = !!this.bccField.trim();
+        this.showCcBcc = !!this.bccField.trim();
 
         // Remember stored spreadsheet filename so UI label survives reload
         this.mergeFileName = (p as any).spreadsheetName ?? null;
@@ -1507,100 +1567,106 @@ export class MailDashboardComponent implements OnInit {
   // Address fields (Bcc toggle)
   // ===========================================================================
   // eslint-disable-next-line @typescript-eslint/member-ordering
-  toggleBcc(): void {
+  toggleCcBcc(): void {
     if (!this.hasSelectedProject) return;
 
-    this.showBcc = !this.showBcc;
+    this.showCcBcc = !this.showCcBcc;
 
-    // If user just opened Bcc, focus it for smooth UX
-    if (this.showBcc) {
-      setTimeout(() => document.getElementById('bccField')?.focus());
+    // focus first field when opening
+    if (this.showCcBcc) {
+      setTimeout(() => document.getElementById('ccField')?.focus());
     }
   }
-
   // ===========================================================================
   // Save project (and shared save observable)
   // ===========================================================================
   // eslint-disable-next-line @typescript-eslint/member-ordering
   saveProject(): void {
     if (!this.projectId) return;
+    if (this.attachmentsLoading) {
+      this.showToast('warn', 'Attachments are still loading, please wait a moment.');
+      return;
+    }
+
     this.saving = true;
 
-    const hasSpreadsheet = !!this.spreadsheetBase64;
-
-    // Build Project object that ProjectService.update() expects (backend update endpoint)
-    const updated: Project = {
-      ...(this.project ?? {}),
-      id: this.projectId,
-      name: this.projectName,
-      header: this.mergeSubjectTemplate,
-      content: this.mergeBodyTemplate,
-      status: 'PENDING',
-
-      // These fields are custom/extended; they are read by backend MailMergeService later when sending
-      toField: this.toField,
-      ccField: this.ccField,
-      bccField: this.bccField,
-
-      // Persist spreadsheet payload and metadata so project can be rehydrated later
-      spreadsheetLink: hasSpreadsheet ? this.spreadsheetBase64 : null,
-      spreadsheetFileContentType: hasSpreadsheet ? this.spreadsheetFileContentType : null,
-
-      // Persist original filename so UI shows the correct name (even after rehydration from DB)
-      spreadsheetName: hasSpreadsheet ? (this.oneDriveSpreadsheetName ?? this.mergeFileName ?? this.mergeFile?.name ?? null) : null,
-    };
-
-    // New attachments are those without an id (they aren't in DB yet)
-    const newAttachmentDTOs = this.attachments
-      .filter(a => !a.id)
-      .map(a => ({
-        file: a.base64,
-        fileContentType: a.fileContentType,
-        name: a.name,
-        size: a.size,
-      }));
-
-    this.projectService
-      .update(updated)
-      .pipe(
-        // Delete attachments that user removed (AttachmentService.deleteById hits backend)
-        switchMap(() => {
-          if (this.deletedAttachmentIds.length > 0) {
-            const deletes = this.deletedAttachmentIds.map(id => this.attachmentService.deleteById(id));
-            return forkJoin(deletes);
-          }
-          return of(null);
-        }),
-        // Save new attachments for this project (AttachmentService.saveForProject hits backend)
-        switchMap(() => {
-          if (newAttachmentDTOs.length > 0) {
-            return this.attachmentService.saveForProject(this.projectId!, newAttachmentDTOs);
-          }
-          return of(null);
-        }),
-      )
+    this.saveProjectAndReturnObservable()
+      .pipe(finalize(() => (this.saving = false)))
       .subscribe({
         next: () => {
-          this.saving = false;
-
-          // UI feedback
           this.saveSuccess = true;
           setTimeout(() => (this.saveSuccess = false), 3000);
-
-          // Clear delete queue now that backend is consistent
-          this.deletedAttachmentIds = [];
-
-          // Keep local project reference consistent
-          this.project = updated;
-
-          // Refresh sidebar list
           this.loadProjects();
+          this.markClean(); // <-- we'll add this
         },
         error: err => {
           console.error('❌ Save failed', err);
-          this.saving = false;
+          this.showToast('error', 'Save failed.');
         },
       });
+  }
+
+  private startDirtyAutosave(): void {
+    this.autosaveTrigger$
+      .pipe(
+        takeUntil(this.destroy$),
+
+        // Wait until user stops typing/changing for 1.2s
+        debounceTime(1200),
+
+        // Must have an open project
+        filter(() => !!this.projectId),
+
+        // Only save if something actually changed
+        filter(() => this.dirty),
+
+        // Don't autosave while unsafe/busy
+        filter(() => !this.saving),
+        filter(() => !this.attachmentsLoading),
+        filter(() => !this.mergeSending()),
+        filter(() => !this.testSending()),
+
+        // Prevent overlapping saves
+        exhaustMap(() => {
+          this.syncAllEditorsToModel();
+          this.saving = true;
+
+          return this.saveProjectAndReturnObservable().pipe(
+            tap(() => {
+              this.markClean();
+              this.loadProjects(); // keep sidebar updated
+            }),
+            finalize(() => (this.saving = false)),
+            catchError(err => {
+              console.error('❌ Autosave failed', err);
+              return of(void 0);
+            }),
+          );
+        }),
+      )
+      .subscribe();
+  }
+
+  private markDirty(): void {
+    this.dirty = true;
+    this.lastDirtyAt = Date.now();
+
+    // Start / restart debounced autosave timer
+    this.autosaveTrigger$.next();
+  }
+
+  private markClean(): void {
+    this.dirty = false;
+  }
+
+  private syncAllEditorsToModel(): void {
+    if (!this.hasSelectedProject) return;
+
+    this.onEditorInput('to');
+    this.onEditorInput('cc');
+    this.onEditorInput('bcc');
+    this.onEditorInput('subject');
+    this.onEditorInput('body');
   }
 
   // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
@@ -1649,12 +1715,28 @@ export class MailDashboardComponent implements OnInit {
       }),
       switchMap(() => {
         if (newAttachmentDTOs.length > 0) {
-          return this.attachmentService.saveForProject(this.projectId!, newAttachmentDTOs);
+          return this.attachmentService.saveForProject(this.projectId!, newAttachmentDTOs).pipe(
+            tap((saved: any) => {
+              // If backend returns an array of saved attachment DTOs with ids:
+              const savedList = Array.isArray(saved) ? saved : [];
+
+              // For each saved attachment, find the matching local one (the one that had no id)
+              // and set its id so it won’t be re-uploaded on the next save/autosave.
+              savedList.forEach(sa => {
+                const local = this.attachments.find(
+                  a => !a.id && a.name === sa.name && a.size === sa.size && a.fileContentType === sa.fileContentType,
+                );
+
+                if (local && sa.id) {
+                  local.id = sa.id;
+                }
+              });
+            }),
+          );
         }
         return of(null);
       }),
       tap(() => {
-        // Keep local state in sync with what was saved
         this.deletedAttachmentIds = [];
         this.project = updated;
       }),
@@ -1713,10 +1795,13 @@ export class MailDashboardComponent implements OnInit {
             setTimeout(() => (this.testSuccess = false), 3000);
           },
           error: err => {
-            console.error('❌ Test send failed', err);
-            this.testSending.set(false);
-            this.testErr.set(true);
-            this.showToast('error', 'Test send failed. Please try again.');
+            console.error('❌ Send failed', err);
+            this.mergeSending.set(false);
+            this.mergeErr.set(true);
+            this.showToast('error', 'Send failed. Saved to Drafts.');
+
+            // Force it back to Drafts (DB + UI)
+            this.markProjectAsDrafts();
           },
         });
       },
@@ -1821,6 +1906,37 @@ export class MailDashboardComponent implements OnInit {
         this.mergeErr.set(true);
         this.showToast('error', 'Could not save before sending.');
       },
+    });
+  }
+
+  private markProjectAsDrafts(): void {
+    if (!this.projectId) return;
+
+    const updatedProject: Project = {
+      ...(this.project ?? {}),
+      id: this.projectId,
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      name: this.projectName ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      header: this.mergeSubjectTemplate ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      content: this.mergeBodyTemplate ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      toField: this.toField ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      ccField: this.ccField ?? '',
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      bccField: this.bccField ?? '',
+      spreadsheetLink: this.spreadsheetBase64 ?? null,
+      spreadsheetFileContentType: this.spreadsheetFileContentType ?? null,
+      spreadsheetName: this.connectedSpreadsheetName,
+      status: 'PENDING',
+      sentAt: null as any, // only if your model/DTO allows; otherwise just omit sentAt
+    };
+
+    this.projectService.update(updatedProject).subscribe({
+      next: () => this.loadProjects(),
+      error: e => console.error('❌ Failed to revert status to PENDING', e),
     });
   }
 
@@ -2028,30 +2144,37 @@ export class MailDashboardComponent implements OnInit {
   // ===========================================================================
   // Mail progress (SSE)
   // ===========================================================================
+  // add this field at class level (near other private fields)
   // eslint-disable-next-line @typescript-eslint/member-ordering
   listenToMailProgress(): void {
-    // Backend emits "mail-progress" events from /api/mail-progress/stream
-    const eventSource = new EventSource('/api/mail-progress/stream');
+    // Close any existing stream (prevents duplicate listeners when navigating)
+    if (this.mailProgressSource) {
+      try {
+        this.mailProgressSource.close();
+      } catch {
+        // ignore
+      }
+      this.mailProgressSource = null;
+    }
 
-    eventSource.addEventListener('mail-progress', (event: MessageEvent) => {
-      // Backend event payload should be JSON: { totalCount, sentCount, email, message }
+    // Backend emits "mail-progress" events from /api/mail-progress/stream
+    const es = new EventSource('/api/mail-progress/stream');
+    this.mailProgressSource = es;
+
+    es.addEventListener('mail-progress', (event: MessageEvent) => {
       const data = JSON.parse(event.data);
 
       if (typeof data.totalCount === 'number' && data.totalCount >= 0) this.sendingTotal = data.totalCount;
       if (typeof data.sentCount === 'number' && data.sentCount >= 0) this.sendingProgress = data.sentCount;
 
-      // Derive whether we are still in progress
       this.sendingInProgress = this.sendingTotal > 0 && this.sendingProgress < this.sendingTotal;
 
-      // Append per-email log line if backend provides it
       if (data.email && data.message) this.progressLogs.push(`${data.email} — ${data.message}`);
 
-      // Mark finished when counts match
       if (this.sendingTotal > 0 && this.sendingProgress >= this.sendingTotal) {
         this.sendingInProgress = false;
         this.sendingFinished = true;
 
-        // Keep finished banner visible for 2 seconds
         if (this.sendingFinishedTimeoutId) {
           clearTimeout(this.sendingFinishedTimeoutId);
           this.sendingFinishedTimeoutId = null;
@@ -2064,7 +2187,7 @@ export class MailDashboardComponent implements OnInit {
       }
     });
 
-    eventSource.onerror = err => console.error('SSE error', err);
+    es.onerror = err => console.error('SSE error', err);
   }
 
   // ===========================================================================
@@ -2125,6 +2248,7 @@ export class MailDashboardComponent implements OnInit {
 
     // Refresh preview model
     this.previewMerge();
+    this.markDirty();
 
     // Return to compose view
     this.activePanel = 'compose';
@@ -2217,12 +2341,15 @@ export class MailDashboardComponent implements OnInit {
       const text = this.htmlToPlainText(html);
 
       if (field === 'subject') this.mergeSubjectTemplate = text;
-      else if (field === 'to') this.toField = text;
+      if (field === 'subject') {
+        this.syncProjectTitleFromSubject();
+      } else if (field === 'to') this.toField = text;
       else if (field === 'cc') this.ccField = text;
       // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
       else if (field === 'bcc') this.bccField = text;
 
       // Update preview after changing any field
+      this.markDirty();
       this.previewMerge();
       return;
     }
@@ -2233,6 +2360,7 @@ export class MailDashboardComponent implements OnInit {
 
     // Preview should stay in sync with body edits
     this.previewMerge();
+    this.markDirty();
   }
 
   private htmlToPlainText(html: string): string {
@@ -2464,12 +2592,19 @@ export class MailDashboardComponent implements OnInit {
 
   // eslint-disable-next-line @typescript-eslint/member-ordering
   getColorForField(key: string): string {
-    // Assign a stable random HSL colour per token label
     const k = key.trim();
-    if (!this.tokenColors[k]) {
-      this.tokenColors[k] = `hsl(${Math.floor(Math.random() * 360)}, 70%, 50%)`;
+
+    // Reuse existing assigned color (stable for same token)
+    if (this.tokenColors[k]) {
+      return this.tokenColors[k];
     }
-    return this.tokenColors[k];
+
+    // Assign next palette color (unique until palette wraps)
+    const color = this.TOKEN_COLOR_PALETTE[this.tokenColorCursor % this.TOKEN_COLOR_PALETTE.length];
+    this.tokenColors[k] = color;
+    this.tokenColorCursor++;
+
+    return color;
   }
 
   private getElementId(field: MergeField): string {
@@ -2527,15 +2662,12 @@ export class MailDashboardComponent implements OnInit {
     const commonEl = common instanceof Element ? common : common.parentElement;
     if (!commonEl || !bodyEl.contains(commonEl)) return;
 
-    if (type === 'bold') {
-      // Deterministic bold (no execCommand) so you can control behaviour around tokens
-      this.toggleStrongOnSelection(sel, bodyEl);
-    } else {
-      // Keep existing behaviour for italic/underline (they're working)
-      const command = type === 'italic' ? 'italic' : 'underline';
-      // eslint-disable-next-line @typescript-eslint/no-deprecated
-      document.execCommand(command, false);
-    }
+    const command = type === 'bold' ? 'bold' : type === 'italic' ? 'italic' : 'underline';
+    // eslint-disable-next-line @typescript-eslint/no-deprecated
+    document.execCommand(command, false);
+
+    // Normalize what the browser produced so your htmlToMarkdown is stable
+    this.normalizeBoldMarkup(bodyEl);
 
     // Save selection AFTER changes so toolbar keeps working for next click
     this.saveBodySelection();
@@ -2545,6 +2677,48 @@ export class MailDashboardComponent implements OnInit {
 
     // Keep preview in sync
     this.previewMerge();
+  }
+
+  private normalizeBoldMarkup(root: HTMLElement): void {
+    // 1) Convert <b> -> <strong>
+    root.querySelectorAll('b').forEach(b => {
+      const strong = document.createElement('strong');
+      while (b.firstChild) strong.appendChild(b.firstChild);
+      b.replaceWith(strong);
+    });
+
+    // 2) Convert <span style="font-weight: ..."> -> <strong> when it looks bold
+    root.querySelectorAll('span[style]').forEach(span => {
+      const style = (span.getAttribute('style') ?? '').toLowerCase();
+      const m = style.match(/font-weight\s*:\s*([^;]+)/);
+      if (!m) return;
+
+      const w = m[1].trim();
+      const isBold = w === 'bold' || w === 'bolder' || (!Number.isNaN(Number(w)) && Number(w) >= 600);
+
+      if (!isBold) return;
+
+      const strong = document.createElement('strong');
+      while (span.firstChild) strong.appendChild(span.firstChild);
+      span.replaceWith(strong);
+    });
+
+    // 3) Flatten nested <strong><strong>...</strong></strong>
+    root.querySelectorAll('strong strong').forEach(inner => {
+      const parent = inner.parentElement as HTMLElement;
+      while (inner.firstChild) parent.insertBefore(inner.firstChild, inner);
+      inner.remove();
+    });
+
+    // 4) Merge adjacent <strong> siblings: </strong><strong> -> one block
+    const strongs = Array.from(root.querySelectorAll('strong'));
+    strongs.forEach(s => {
+      const next = s.nextSibling;
+      if (next instanceof HTMLElement && next.tagName === 'STRONG') {
+        while (next.firstChild) s.appendChild(next.firstChild);
+        next.remove();
+      }
+    });
   }
 
   /**
@@ -2980,6 +3154,7 @@ export class MailDashboardComponent implements OnInit {
 
     // Refresh preview and return to compose
     this.previewMerge();
+    this.markDirty();
     this.activePanel = 'compose';
 
     // Re-render body so signature appears visually in editor
@@ -3056,7 +3231,7 @@ export class MailDashboardComponent implements OnInit {
   // Sidebar: Search / Filter
   // ===========================================================================
   // eslint-disable-next-line @typescript-eslint/member-ordering
-  toggleFolder(key: 'PENDING' | 'FAILED' | 'SENT'): void {
+  toggleFolder(key: 'PENDING' | 'SENT'): void {
     this.folderOpen[key] = !this.folderOpen[key];
   }
 
@@ -3086,10 +3261,6 @@ export class MailDashboardComponent implements OnInit {
 
   get pendingProjects(): Project[] {
     return this.filteredAllProjects.filter(p => (p as any).status === 'PENDING');
-  }
-
-  get failedProjects(): Project[] {
-    return this.filteredAllProjects.filter(p => (p as any).status === 'FAILED');
   }
 
   get sentProjects(): Project[] {
@@ -3618,6 +3789,80 @@ export class MailDashboardComponent implements OnInit {
     }
   }
 
+  get canBuildConditional(): boolean {
+    return !!this.selectedConditionalType && !!this.selectedConditionalField && this.spreadsheetHeaders.length > 0;
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  toggleConditionals(): void {
+    this.conditionalsOpen = !this.conditionalsOpen;
+  }
+
+  private buildConditionalSnippet(): string {
+    const field = (this.selectedConditionalField ?? '').trim();
+
+    // If no field, return a nice placeholder snippet (won't be draggable anyway)
+    if (!field) {
+      return 'Connect a spreadsheet and select a field';
+    }
+
+    if (this.selectedConditionalType === 'thunderbird') {
+      // IMPORTANT: your thunderbird parser expects FIRST PART = raw column name (no {{}})
+      // e.g. {{Status|==|"VIP"|THEN|ELSE}}
+      return `{{${field}|==|"VALUE"|THEN_TEXT|ELSE_TEXT}}`;
+    }
+
+    if (this.selectedConditionalType === 'nestedIf') {
+      // You asked for only 2 dropdowns total (type + one field), so reuse the same field for both conditions.
+      return (
+        `[[if {{${field}}} == "VALUE_1"]]\n` +
+        `TEXT_A\n` +
+        `[[else]]\n` +
+        `  [[if {{${field}}} == "VALUE_2"]]\n` +
+        `  TEXT_B\n` +
+        `  [[else]]\n` +
+        `  TEXT_C\n` +
+        `  [[endif]]\n` +
+        `[[endif]]`
+      );
+    }
+
+    // default: plain [[if]] block
+    return `[[if {{${field}}} == "VALUE"]]\n` + `YOUR_TEXT\n` + `[[else]]\n` + `ELSE_TEXT\n` + `[[endif]]`;
+  }
+
+  /** For the UI preview: show the snippet with coloured merge tokens */
+  get conditionalSnippetPreviewHtml(): SafeHtml {
+    const snippet = this.buildConditionalSnippet();
+
+    // escape HTML, preserve newlines, and decorate {{FIELD}} tokens into spans
+    let html = this.escapeHtml(snippet).replace(/\n/g, '<br>');
+
+    html = html.replace(/{{\s*([^}]+)\s*}}/g, (_m, rawKey: string) => {
+      // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
+      const key = String(rawKey ?? '').trim();
+      if (!this.isKnownMergeField(key)) return `{{${this.escapeHtml(key)}}}`;
+
+      return `<span class="merge-token" data-field="${this.escapeAttr(key)}" contenteditable="false" style="background:${this.getColorForField(
+        key,
+      )}">${this.escapeHtml(key)}</span>`;
+    });
+
+    return this.sanitizer.bypassSecurityTrustHtml(html);
+  }
+
+  /** Drag handler for the builder */
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  onConditionalBuilderDragStart(event: DragEvent): void {
+    if (!this.canBuildConditional) {
+      event.preventDefault();
+      return;
+    }
+
+    const text = this.buildConditionalSnippet();
+    event.dataTransfer?.setData('text/plain', text);
+  }
+
   // ===========================================================================
   // Conditionals-aware send payload builder
   // ===========================================================================
@@ -3730,5 +3975,216 @@ export class MailDashboardComponent implements OnInit {
       spreadsheetFileContentType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
       attachments: this.attachments.map(a => ({ name: a.name, fileContentType: a.fileContentType, file: a.base64 })),
     };
+  }
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private mailProgressSource: EventSource | null = null;
+
+  // Store handler refs so removeEventListener works
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  private readonly onDocKeydown = (e: KeyboardEvent) => {
+    if (e.key !== 'Backspace') return;
+
+    const sel = window.getSelection();
+    if (!sel?.anchorNode) return;
+
+    const anchor = sel.anchorNode;
+    const container = anchor instanceof Element ? anchor.closest('.merge-editor') : anchor.parentElement?.closest('.merge-editor');
+    if (!container) return;
+
+    const editorEl = container as HTMLElement;
+
+    // If editor is visually empty, prevent odd <br> behaviour
+    const plain = editorEl.innerText.replace(/\u00A0/g, ' ').trim();
+    if (plain === '') {
+      e.preventDefault();
+      editorEl.innerHTML = '';
+      return;
+    }
+
+    // 1) If caret is directly inside a token, delete that token
+    const directToken = anchor instanceof Element ? anchor.closest('.merge-token') : anchor.parentElement?.closest('.merge-token');
+    let tokenToDelete: HTMLElement | null = (directToken as HTMLElement | null) ?? null;
+
+    // 2) If not inside token, try to delete token immediately BEFORE caret
+    if (!tokenToDelete && sel.rangeCount > 0 && sel.getRangeAt(0).collapsed) {
+      tokenToDelete = this.getPreviousSignificantNodeBeforeCaret(editorEl, sel) as HTMLElement | null;
+    }
+
+    if (!tokenToDelete) return;
+
+    e.preventDefault();
+
+    // Put caret where token was (before removing)
+    const caretRange = document.createRange();
+    caretRange.setStartBefore(tokenToDelete);
+    caretRange.collapse(true);
+
+    // Remove adjacent trailing NBSP/space if present (clean deletion)
+    const next = tokenToDelete.nextSibling;
+    if (next && next.nodeType === Node.TEXT_NODE) {
+      const txt = next.textContent ?? '';
+      if (txt.startsWith('\u00A0') || txt.startsWith(' ')) {
+        next.textContent = txt.slice(1);
+        if (next.textContent === '') {
+          next.parentNode?.removeChild(next);
+        }
+      }
+    }
+
+    tokenToDelete.remove();
+
+    // Restore caret
+    sel.removeAllRanges();
+    sel.addRange(caretRange);
+
+    // Sync model
+    const id = editorEl.id;
+    let field: MergeField | null = null;
+
+    if (id === 'mergeBody') field = 'body';
+    else if (id === 'mergeSubject') field = 'subject';
+    else if (id === 'toField') field = 'to';
+    else if (id === 'ccField') field = 'cc';
+    else if (id === 'bccField') field = 'bcc';
+
+    if (field) {
+      this.onEditorInput(field);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  private readonly onDocMouseup = () => {
+    const sel = window.getSelection();
+    if (!sel?.anchorNode) return;
+
+    const token = sel.anchorNode.parentElement?.closest('.merge-token');
+    if (token && sel.anchorNode === token.firstChild) {
+      const range = document.createRange();
+      range.setStartAfter(token);
+      range.collapse(true);
+
+      sel.removeAllRanges();
+      sel.addRange(range);
+    }
+  };
+
+  // eslint-disable-next-line @typescript-eslint/explicit-function-return-type
+  private readonly onDocSelectionChange = () => this.saveBodySelection();
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private readonly autosaveTrigger$ = new Subject<void>();
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private readonly TOKEN_COLOR_PALETTE: string[] = [
+    '#ef4444', // red
+    '#f97316', // orange
+    '#f59e0b', // amber
+    '#84cc16', // lime
+    '#22c55e', // green
+    '#10b981', // emerald
+    '#14b8a6', // teal (not cyan)
+    '#8b5cf6', // violet
+    '#a855f7', // purple
+    '#d946ef', // fuchsia
+    '#ec4899', // pink
+    '#e11d48', // rose
+    '#fb7185', // soft rose
+    '#f43f5e', // stronger rose
+    '#c084fc', // soft purple
+    '#6366f1', // indigo
+    '#65a30d', // olive green
+    '#ca8a04', // mustard
+    '#ea580c', // deep orange
+    '#dc2626', // darker red
+  ];
+
+  // eslint-disable-next-line @typescript-eslint/member-ordering
+  private tokenColorCursor = 0;
+
+  private isMergeTokenNode(node: Node | null): node is HTMLElement {
+    return !!node && node instanceof HTMLElement && node.classList.contains('merge-token');
+  }
+
+  private isIgnorableNode(node: Node | null): boolean {
+    if (!node) return true;
+
+    // Ignore empty/whitespace text nodes
+    if (node.nodeType === Node.TEXT_NODE) {
+      return !(node.textContent ?? '').replace(/\u00A0/g, '').trim();
+    }
+
+    // Ignore <br>
+    if (node instanceof HTMLElement && node.tagName === 'BR') return true;
+
+    return false;
+  }
+
+  private deepestRightNode(node: Node | null): Node | null {
+    let cur = node;
+    while (cur?.lastChild) {
+      cur = cur.lastChild;
+    }
+    return cur;
+  }
+
+  private previousNodeFrom(root: HTMLElement, node: Node | null): Node | null {
+    let cur = node;
+
+    while (cur && cur !== root) {
+      if (cur.previousSibling) {
+        return this.deepestRightNode(cur.previousSibling);
+      }
+      cur = cur.parentNode;
+    }
+
+    return null;
+  }
+
+  private getPreviousSignificantNodeBeforeCaret(root: HTMLElement, sel: Selection): Node | null {
+    if (!sel.rangeCount) return null;
+
+    const range = sel.getRangeAt(0);
+    const container = range.startContainer;
+    const offset = range.startOffset;
+
+    let candidate: Node | null = null;
+
+    if (container.nodeType === Node.TEXT_NODE) {
+      // If caret is inside text and not at the start, don't delete token (normal text backspace)
+      if (offset > 0) return null;
+
+      // At start of text node: inspect previous node in DOM
+      candidate = this.previousNodeFrom(root, container);
+    } else if (container instanceof Element) {
+      // If caret is in an element, inspect child before offset
+      if (offset > 0) {
+        candidate = this.deepestRightNode(container.childNodes[offset - 1] ?? null);
+      } else {
+        candidate = this.previousNodeFrom(root, container);
+      }
+    }
+
+    // Skip whitespace text and <br> nodes
+    while (candidate && this.isIgnorableNode(candidate)) {
+      candidate = this.previousNodeFrom(root, candidate);
+    }
+
+    // If candidate is text inside a token, bubble up to token
+    if (candidate && !(candidate instanceof HTMLElement)) {
+      const parentToken = candidate.parentElement?.closest('.merge-token');
+      if (parentToken && root.contains(parentToken)) return parentToken;
+    }
+
+    // If candidate is an element and itself a token, return it
+    if (this.isMergeTokenNode(candidate)) return candidate;
+
+    // If candidate is inside token wrapper, return that token
+    if (candidate instanceof Element) {
+      const token = candidate.closest('.merge-token');
+      if (token && root.contains(token)) return token as HTMLElement;
+    }
+
+    return null;
   }
 }

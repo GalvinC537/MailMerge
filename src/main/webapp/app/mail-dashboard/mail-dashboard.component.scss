@@ -74,6 +74,28 @@
     .mm-folder-caret {
       display: none;
     }
+
+    .mm-project-item {
+      padding: 10px 0;
+      justify-content: center;
+      gap: 0; // optional, keeps it perfectly centered
+    }
+
+    /* IMPORTANT: hide the whole main content container, not just its text */
+    .mm-project-main {
+      display: none;
+    }
+
+    /* Center the delete icon nicely */
+    .mm-project-delete {
+      margin: 0;
+      padding: 0;
+      width: 34px;
+      height: 34px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
   }
 }
 
@@ -877,6 +899,8 @@
 
 .mm-email-body {
   color: var(--mm-text);
+  font-weight: 400;     /* match #mergeBody */
+  font-family: inherit; /* stops preview using a different font */
 }
 
 /* Preview attachments chips */
@@ -898,7 +922,7 @@
 /* Keep formatting correctness */
 .merge-editor b,
 .merge-editor strong {
-  font-weight: bold !important;
+  font-weight: 700 !important;
 }
 .merge-editor i,
 .merge-editor em {
@@ -908,10 +932,15 @@
   text-decoration: underline !important;
 }
 
-.mm-panel .mm-email-body * b,
-.mm-panel .mm-email-body * strong {
+.mm-email-body strong,
+.mm-email-body b {
   font-weight: 700 !important;
 }
+
+.mm-email-body span[style*="font-weight"] {
+  font-weight: 700 !important;
+}
+
 .mm-panel .mm-email-body * i,
 .mm-panel .mm-email-body * em {
   font-style: italic !important;
@@ -1304,4 +1333,124 @@
   .mm-bottom-split-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* =========================================================
+   Conditionals — compact selects + snippet on the right
+   ========================================================= */
+
+.mm-cond-builder {
+  margin-top: 10px; /* keep spacing consistent with other blocks */
+}
+
+/* Let the collapsible body inherit the same feel as other panels */
+.mm-cond-body {
+  background: var(--mm-bg);
+}
+
+/* Two-column layout inside the body */
+.mm-cond-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 420px) 1fr; /* compact controls, flexible snippet */
+  gap: 14px;
+  align-items: start;
+}
+
+/* Left side */
+.mm-cond-controls {
+  min-width: 0;
+}
+
+/* Keep your label+control alignment, but don’t force full-width selects */
+.mm-cond-row {
+  display: grid;
+  grid-template-columns: 60px 1fr;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.mm-cond-label {
+  font-size: 12px;
+  color: var(--mm-muted);
+  font-weight: 800;
+}
+
+/* Make selects compact (no “full screen width” look) */
+.mm-cond-select {
+  width: 100%;
+  max-width: 320px;          /* key bit: caps how wide it can get */
+  border-radius: 12px;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-panel);
+  color: var(--mm-text);
+
+  &:focus {
+    box-shadow: var(--mm-focus);
+    border-color: rgba(0, 188, 212, 0.6);
+    background: #fff;
+  }
+}
+
+/* Right side snippet card */
+.mm-cond-snippet-wrap {
+  min-width: 0;
+  border: 1px solid var(--mm-border);
+  background: var(--mm-panel);
+  border-radius: 14px;
+  padding: 10px;
+}
+
+.mm-cond-snippet-title {
+  font-size: 0.78rem;
+  font-weight: 900;
+  color: var(--mm-muted);
+  margin-bottom: 8px;
+}
+
+/* Override your earlier .mm-draggable so it matches your theme */
+.mm-cond-snippet {
+  margin: 0; /* remove the old margin-bottom from .mm-draggable */
+  padding: 10px 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(0, 0, 0, 0.18);
+  background: var(--mm-bg);
+  color: var(--mm-text);
+  line-height: 1.4;
+
+  &:hover {
+    background: var(--mm-hover);
+  }
+}
+
+.mm-cond-snippet.mm-disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* Responsive: stack controls above snippet on small screens */
+@media (max-width: 900px) {
+  .mm-cond-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .mm-cond-select {
+    max-width: 100%;
+  }
+}
+
+/* Ensure normal text has a known base weight */
+#mergeBody {
+  font-weight: 400;
+}
+
+/* Force bold to be a single, consistent bold level */
+#mergeBody strong,
+#mergeBody b {
+  font-weight: 700;
+}
+
+/* If the browser emits span-based bold */
+#mergeBody span[style*="font-weight"] {
+  font-weight: 700 !important;
 }
